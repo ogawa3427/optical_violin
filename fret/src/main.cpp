@@ -8,24 +8,10 @@ bool dataReadyX = false;  // データが準備完了したかどうかを示す
 bool dataReadyY = true;  // データが準備完了したかどうかを示すフラグ
 
 void requestEvent() {
-  Serial.println(dataX, BIN);
-  Serial.println(dataY, BIN);
-  char bufferX[33]; // 32ビット + NULL終端
-  char bufferY[33]; // 32ビット + NULL終端
-
-  // dataXとdataYを文字列に変換
-  for (int i = 0; i < 32; i++) {
-    bufferX[31 - i] = (dataX & (1 << i)) ? '1' : '0';
-    bufferY[31 - i] = (dataY & (1 << i)) ? '1' : '0';
-  }
-  bufferX[32] = '\0';
-  bufferY[32] = '\0';
-
-  // 文字列として送信
   if (dataReadyX) {
-    Wire.write(bufferX);
+    Wire.write((uint8_t*)&dataX, sizeof(dataX));
   } else if (dataReadyY) {
-    Wire.write(bufferY);
+    Wire.write((uint8_t*)&dataY, sizeof(dataY));
   }
 }
 
