@@ -1,161 +1,189 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-static String toneName = "Error";
-static String lasttoneName = "Error";
+static int toneNum = 0;
+static int lasttoneNum = 0;
 
 static char line = 'i';
+
+
+#include <M5UnitSynth.h>
+#include <note.h>
+
+M5UnitSynth synth;
+
+int instrument = 41;
 
 void setup()
 {
   Wire.begin();          // I2Cを初期化
   USBSerial.begin(9600); // シリアル通信を9600bpsで開始
+  synth.begin(&Serial1, UNIT_SYNTH_BAUD, 1, 2);
+  synth.setInstrument(0, 0, instrument);
+  synth.setNoteOn(0, NOTE_C6, 127);
+  delay(1000);
+  synth.setNoteOff(0, NOTE_C6, 0);
 }
 
 void loop()
 {
-  line = 'G'; //'D', 'A', 'E'
+  line = 'E'; //'G','D', 'A', 'E'
 
   Wire.requestFrom(0x08, 4); // I2Cデバイスから4バイトのデータを要求
   uint8_t loopCount = 0;
   while (Wire.available())
   {                       
-    char c = Wire.read(); // 1バイト読み取る
+    uint8_t c = Wire.read(); // 1バイト読み取る
     if (loopCount == 0 && line == 'G')
     {
-      if (c & 0x08) // 3ビット目をチェック
+      if (c >= 0b10000 && c < 0b100000)
       {
-        toneName = "2As";
+        toneNum = NOTE_GS6;
       }
-      else if (c & 0x04) // 2ビット目をチェック
+      else if (c >= 0b100000 && c < 0b1000000)
       {
-        toneName = "2A";
+        toneNum = NOTE_A6;
       }
-      else if (c & 0x02) // 1ビット目をチェック
+      else if (c >= 0b1000000 && c < 0b10000000)
       {
-        toneName = "2B";
+        toneNum = NOTE_AS6;
       }
-      else if (c & 0x01) // 0ビット目をチェック
+      else if (c >= 0b10000000 && c < 0b100000000)
       {
-        toneName = "2H";
+        toneNum = NOTE_B6;
       }
       else if (c == 0)
       {
-        toneName = "2G";
+        toneNum = NOTE_G6;
       }
     }
     else if (loopCount == 1 && line == 'G')
     {
-      if (c & 0x80) // 7ビット目をチェック
+      if (c == 0b1)
       {
-        toneName = "2C";
-      } else if (c == 0) {
-        toneName = "2G";
-      }
+        toneNum = NOTE_C7;
+      } //else if (c == 0) {
+      //   toneNum = NOTE_G6;
+      // }
     }
     else if (loopCount == 1 && line == 'D')
     {
-      if (c & 0x40) // 6ビット目をチェック
+      if (c >= 0b10 && c < 0b100)
       {
-        toneName = "2Es";
+        toneNum = NOTE_DS6;
       }
-      else if (c & 0x20) // 5ビット目をチェック
+      else if (c >= 0b100 && c < 0b1000)
       {
-        toneName = "2E";
+        toneNum = NOTE_E6;
       }
-      else if (c & 0x10) // 4ビット目をチェック
+      else if (c >= 0b1000 && c < 0b10000)
       {
-        toneName = "2F";
+        toneNum = NOTE_F6;
       }
-      else if (c & 0x08) // 3ビット目をチェック
+      else if (c >= 0b10000 && c < 0b100000)
       {
-        toneName = "2Ges";
+        toneNum = NOTE_FS6;
       }
-      else if (c & 0x04) // 2ビット目をチェック
+      else if (c >= 0b100000 && c < 0b1000000)
       {
-        toneName = "2G";
+        toneNum = NOTE_G6;
       }
       else if (c == 0)
       {
-        toneName = "2D";
+        toneNum = NOTE_D6;
       }
     }
     else if (loopCount == 1 && line == 'A')
     {
-      if (c & 0x02) // 1ビット目をチェック
+      if (c >= 0b1000000 && c < 0b10000000)
       {
-        toneName = "1B";
+        toneNum = NOTE_AS6;
       }
-      else if (c & 0x01) // 0ビット目をチェック
+      else if (c >= 0b10000000 && c < 0b100000000)
       {
-        toneName = "1H";
+        toneNum = NOTE_B6;
       }
       else if (c == 0)
       {
-        toneName = "1A";
+        toneNum = NOTE_A6;
       }
     }
     else if (loopCount == 2 && line == 'A')
     {
-      if (c & 0x80) // 7ビット目をチェック
+      if (c == 0b1)
       {
-        toneName = "1C";
+        toneNum = NOTE_C5;
       }
-      else if (c & 0x40) // 6ビット目をチェック
+      else if (c >= 0b10 && c < 0b100)
       {
-        toneName = "1Des";
+        toneNum = NOTE_CS5;
       }
-      else if (c & 0x20) // 5ビット目をチェック
+      else if (c >= 0b100 && c < 0b1000)
       {
-        toneName = "1D";
+        toneNum = NOTE_D5;
       }
-      else if (c == 0)
-      {
-        toneName = "1A";
-      }
+      // else if (c == 0)
+      // {
+      //   toneNum = NOTE_A5;
+      // }
     }
     else if (loopCount == 2 && line == 'E')
     {
-      if (c & 0x10) // 4ビット目をチェック
+      USBSerial.println(c, BIN); // シリアルモニタに表示
+      if (c >= 0b1000 && c < 0b10000) // 4ビット目をチェック
       {
-        toneName = "1F";
+        toneNum = NOTE_F5;
       }
-      else if (c & 0x08) // 3ビット目をチェック
+      else if (c >= 0b10000 && c < 0b100000) // 5ビット目をチェック
       {
-        toneName = "1Ges";
+        toneNum = NOTE_FS5;
       }
-      else if (c & 0x04) // 2ビット目をチェック
+      else if (c >= 0b100000 && c < 0b1000000) // 6ビット目をチェック
       {
-        toneName = "1G";
+        toneNum = NOTE_G5;
       }
-      else if (c & 0x02) // 1ビット目をチェック
+      else if (c >= 0b1000000 && c < 0b10000000) // 7ビット目をチェック
       {
-        toneName = "1As";
+        toneNum = NOTE_GS5;
       }
       else if (c == 0)
       {
-        toneName = "1E";
+        toneNum = NOTE_E5;
       }
     }
     else if (loopCount == 3 && line == 'E')
     {
-      if (c & 0x20) // 5ビット目をチェック
+      USBSerial.println(c, BIN); // シリアルモニタに表示
+
+      if (c == 0b100)
       {
-        toneName = "1A";
+        toneNum = NOTE_A5;
       }
-      else if (c == 0)
+      else
       {
-        toneName = "1E";
+        toneNum = toneNum;
       }
+      // else if (c == 0)
+      // {
+      //   toneNum = NOTE_E5;
+      // }
     }
     loopCount++;
   }
 
-  if (toneName != lasttoneName)
+  if (toneNum != lasttoneNum)
   {
-    USBSerial.print(toneName); // シリアルモニタに表示
-    lasttoneName = toneName;
+    USBSerial.println(toneNum); // シリアルモニタに表示
+    synth.setInstrument(0, 0, instrument);
+    synth.setNoteOff(0, lasttoneNum, 0);
+
+    if (toneNum != 0)
+    {
+      synth.setNoteOn(0, toneNum, 20);
+    }
+    lasttoneNum = toneNum;
   }
-  USBSerial.println(); // 改行
-  delay(100);          // 1秒間の遅延
+  // USBSerial.println(toneNum); // シリアルモニタに表示
+
+  delay(10);          // 1秒間の遅延
 }
