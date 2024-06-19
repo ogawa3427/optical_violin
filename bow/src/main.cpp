@@ -179,7 +179,7 @@ void loop()
 
     if (toneNum != 0)
     {
-      synth.setNoteOn(0, toneNum, 20);
+      synth.setNoteOn(0, toneNum, 127);
     }
     lasttoneNum = toneNum;
   }
