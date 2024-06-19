@@ -5,8 +5,8 @@ static int toneNum = 0;
 static int lasttoneNum = 0;
 
 static char line = 'i';
-bool sw_R
-bool sw_L
+bool sw_R = false;
+bool sw_L = false;
 
 
 #include <M5UnitSynth.h>
@@ -38,15 +38,22 @@ void loop()
     uint8_t c = Wire.read();
     if (loopCount == 3)
     {
-      if (c >= 0b1000 && c < 0b10000)
+      USBSerial.println(c, BIN);
+      if ((c & 0b1000) == 0b1000)
       {
         sw_R = true;
+      } 
+      else {
+        sw_R = false;
       }
       if (c >= 0b10000 && c < 0b100000)
       {
         sw_L = true;
       }
-      
+      else
+      {
+        sw_L = false;
+      }
       if (sw_L && !sw_R)
       {
         line = 'E';
@@ -167,7 +174,6 @@ void loop()
     }
     else if (loopCount == 2 && line == 'E')
     {
-      USBSerial.println(c, BIN); // シリアルモニタに表示
       if (c >= 0b1000 && c < 0b10000) // 4ビット目をチェック
       {
         toneNum = NOTE_F5;
@@ -191,8 +197,6 @@ void loop()
     }
     else if (loopCount == 3 && line == 'E')
     {
-      USBSerial.println(c, BIN); // シリアルモニタに表示
-
       if (c == 0b100)
       {
         toneNum = NOTE_A5;
@@ -222,6 +226,7 @@ void loop()
     lasttoneNum = toneNum;
   }
   // USBSerial.println(toneNum); // シリアルモニタに表示
-
-  delay(10);          // 1秒間の遅延
+  USBSerial.println(line);
+  USBSerial.println(toneNum);
+  delay(100);         // 1秒間の遅延
 }
