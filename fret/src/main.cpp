@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <Wire.h>
-uint8_t goioNums[] = {2, 3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26};
+uint8_t goioNums[] = {2, 3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28};
 
 uint32_t dataX = 0; // ビット列として初期化
 uint32_t dataY = 0; // ビット列として初期化
@@ -44,4 +44,11 @@ void loop() {
     dataReadyY = false;
   }
   delay(10);
+  // delay(100);
+  // for (int i = 0; i < 4; i++) {
+  //   uint8_t byte = (dataX >> (i * 8)) & 0xFF;
+  //   Serial.print(byte, BIN);
+  //   Serial.print(" ");
+  // }
+  // Serial.println();
 }
