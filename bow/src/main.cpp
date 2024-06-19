@@ -5,6 +5,8 @@ static int toneNum = 0;
 static int lasttoneNum = 0;
 
 static char line = 'i';
+bool sw_R
+bool sw_L
 
 
 #include <M5UnitSynth.h>
@@ -28,9 +30,45 @@ void setup()
 void loop()
 {
   line = 'E'; //'G','D', 'A', 'E'
+  // 1/100秒で変わることはちょっと忘れさせてください
+  Wire.requestFrom(0x08, 4);
+  uint8_t loopCount = 0;
+  while (Wire.available())
+  {
+    uint8_t c = Wire.read();
+    if (loopCount == 3)
+    {
+      if (c >= 0b1000 && c < 0b10000)
+      {
+        sw_R = true;
+      }
+      if (c >= 0b10000 && c < 0b100000)
+      {
+        sw_L = true;
+      }
+      
+      if (sw_L && !sw_R)
+      {
+        line = 'E';
+      }
+      else if (!sw_L && !sw_R)
+      {
+        line = 'A';
+      }
+      else if (!sw_L && sw_R)
+      {
+        line = 'D';
+      }
+      else if (sw_L && sw_R)
+      {
+        line = 'G';
+      }
+    }
+    loopCount++; 
+  }
 
   Wire.requestFrom(0x08, 4); // I2Cデバイスから4バイトのデータを要求
-  uint8_t loopCount = 0;
+  loopCount = 0;
   while (Wire.available())
   {                       
     uint8_t c = Wire.read(); // 1バイト読み取る
