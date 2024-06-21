@@ -1,8 +1,50 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <Encoder.h>
+#include "driver/pcnt.h"
+#include <array>
+#include <vector>
+bool sustain = false;
 
-// Encoder encoder(5, 6);
+// diffの値を格納するキュー
+std::vector<int> diffValues;
+int aveDiff = 0;
+
+#define ECD_PIN_A 5
+#define ECD_PIN_B 6
+Encoder encoder(ECD_PIN_A, ECD_PIN_B);
+
+// エンコーダの値を格納する変数
+volatile long encoderValue = 0;
+
+void readEncoderTask(void *parameter) {
+  long newPosition;
+  int diff = 0;
+  for (;;) {
+    diff = 0;  // newPositionを読み取る前にdiffを0にリセット
+    newPosition = encoder.read();
+    if (newPosition != encoderValue) {
+      encoderValue = newPosition;
+      diff = 10;
+      // USBSerial.println("diff");
+    }
+    // キューにdiffの値を保存
+    diffValues.push_back(diff);
+    if (diffValues.size() > 10) {
+      diffValues.erase(diffValues.begin()); // キューが最大サイズを超えたら、最初の値を削除
+    }
+    // USBSerial.println(encoderValue); // シリアルモニタに表示
+    if (diffValues.size() > 0) {
+      int sum = 0;
+      for (int i = 0; i < diffValues.size(); i++) {
+        sum += diffValues[i];
+      }
+      aveDiff = sum / static_cast<float>(diffValues.size());
+    }
+    
+    vTaskDelay(5 / portTICK_PERIOD_MS); // 10ミリ秒ごとに更新
+  }
+}
 
 static int toneNum = 0;
 static int lasttoneNum = 0;
@@ -28,12 +70,22 @@ void setup()
   synth.setNoteOn(0, NOTE_C6, 127);
   delay(1000);
   synth.setNoteOff(0, NOTE_C6, 0);
+
+  xTaskCreatePinnedToCore(
+    readEncoderTask,   // タスク関数
+    "ReadEncoderTask", // タスク名
+    10000,             // スタックサイズ
+    NULL,              // タスクパラメータ
+    1,                 // 優先度
+    NULL,              // タスクハンドル
+    0                  // 実行するコア（0または1）
+  );
 }
 
 void loop()
 {
   line = 'E'; //'G','D', 'A', 'E'
-  // 1/100秒で変わることはちょっと忘れさせてください
+  // 1/100秒で変���ることはちょっと忘れさせてください
   Wire.requestFrom(0x08, 4);
   uint8_t loopCount = 0;
   while (Wire.available())
@@ -41,7 +93,6 @@ void loop()
     uint8_t c = Wire.read();
     if (loopCount == 3)
     {
-      USBSerial.println(c, BIN);
       if ((c & 0b1000) == 0b1000)
       {
         sw_R = true;
@@ -216,21 +267,26 @@ void loop()
     loopCount++;
   }
 
-  if (toneNum != lasttoneNum)
-  {
-    USBSerial.println(toneNum); // シリアルモニタに表示
-    synth.setInstrument(0, 0, instrument);
-    synth.setNoteOff(0, lasttoneNum, 0);
 
-    if (toneNum != 0)
-    {
-      synth.setNoteOn(0, toneNum, 127);
-    }
-    lasttoneNum = toneNum;
-  }
   // USBSerial.println(toneNum); // シリアルモニタに表示
   // USBSerial.println(line);
   // USBSerial.println(toneNum);
   // Serial.println(encoder.read());
-  delay(100);         // 1秒間の遅延
+  // USBSerial.println(aveDiff);
+
+  if (!sustain && aveDiff != 0)
+  {
+    synth.setInstrument(0, 0, instrument);
+    synth.setNoteOff(0, lasttoneNum, 0);
+    synth.setNoteOn(0, toneNum, 127);
+    lasttoneNum = toneNum;
+    sustain = true;
+  }
+  else if (sustain && aveDiff == 0)
+  {
+    synth.setNoteOff(0, lasttoneNum, 0);
+    sustain = false;
+  }
+
+  delay(10);
 }
