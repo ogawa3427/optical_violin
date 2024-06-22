@@ -84,56 +84,56 @@ void setup()
 
 void loop()
 {
-  line = 'E'; //'G','D', 'A', 'E'
-  // 1/100秒で変���ることはちょっと忘れさせてください
-  Wire.requestFrom(0x08, 4);
+  // line = 'E'; //'G','D', 'A', 'E'
+  // // 1/100秒で変ることはちょっと忘れさせてください
+  // Wire.requestFrom(0x08, 4);
   uint8_t loopCount = 0;
-  while (Wire.available())
-  {
-    uint8_t c = Wire.read();
-    if (loopCount == 3)
-    {
-      if ((c & 0b1000) == 0b1000)
-      {
-        sw_R = true;
-      } 
-      else {
-        sw_R = false;
-      }
-      if (c >= 0b10000 && c < 0b100000)
-      {
-        sw_L = true;
-      }
-      else
-      {
-        sw_L = false;
-      }
-      if (sw_L && !sw_R)
-      {
-        line = 'E';
-      }
-      else if (!sw_L && !sw_R)
-      {
-        line = 'A';
-      }
-      else if (!sw_L && sw_R)
-      {
-        line = 'D';
-      }
-      else if (sw_L && sw_R)
-      {
-        line = 'G';
-      }
-    }
-    loopCount++; 
-  }
+  // while (Wire.available())
+  // {
+  //   uint8_t c = Wire.read();
+  //   if (loopCount == 3)
+  //   {
+  //     if ((c & 0b1000) == 0b1000)
+  //     {
+  //       sw_R = true;
+  //     } 
+  //     else {
+  //       sw_R = false;
+  //     }
+  //     if (c >= 0b10000 && c < 0b100000)
+  //     {
+  //       sw_L = true;
+  //     }
+  //     else
+  //     {
+  //       sw_L = false;
+  //     }
+  //     if (sw_L && !sw_R)
+  //     {
+  //       line = 'E';
+  //     }
+  //     else if (!sw_L && !sw_R)
+  //     {
+  //       line = 'A';
+  //     }
+  //     else if (!sw_L && sw_R)
+  //     {
+  //       line = 'D';
+  //     }
+  //     else if (sw_L && sw_R)
+  //     {
+  //       line = 'G';
+  //     }
+  //   }
+  //   loopCount++; 
+  // }
 
   Wire.requestFrom(0x08, 4); // I2Cデバイスから4バイトのデータを要求
   loopCount = 0;
   while (Wire.available())
   {                       
     uint8_t c = Wire.read(); // 1バイト読み取る
-    if (loopCount == 0 && line == 'G')
+    if (loopCount == 0) // && line == 'G')
     {
       if (c >= 0b10000 && c < 0b100000)
       {
@@ -151,12 +151,12 @@ void loop()
       {
         toneNum = NOTE_B6;
       }
-      else if (c == 0)
-      {
-        toneNum = NOTE_G6;
-      }
+      // else if (c == 0)
+      // {
+      //   toneNum = NOTE_G6;
+      // }
     }
-    else if (loopCount == 1 && line == 'G')
+    else if (loopCount == 1)// && line == 'G')
     {
       if (c == 0b1)
       {
@@ -164,9 +164,9 @@ void loop()
       } //else if (c == 0) {
       //   toneNum = NOTE_G6;
       // }
-    }
-    else if (loopCount == 1 && line == 'D')
-    {
+// }
+    // else if (loopCount == 1);// && line == 'D')
+    // {
       if (c >= 0b10 && c < 0b100)
       {
         toneNum = NOTE_DS6;
@@ -187,47 +187,47 @@ void loop()
       {
         toneNum = NOTE_G6;
       }
-      else if (c == 0)
-      {
-        toneNum = NOTE_D6;
-      }
-    }
-    else if (loopCount == 1 && line == 'A')
-    {
+      // else if (c == 0)
+      // {
+      //   toneNum = NOTE_D6;
+      // }
+    // }
+    // else if (loopCount == 1);// && line == 'A')
+    // {
       if (c >= 0b1000000 && c < 0b10000000)
       {
-        toneNum = NOTE_AS6;
+        toneNum = NOTE_AS5;
       }
       else if (c >= 0b10000000 && c < 0b100000000)
       {
-        toneNum = NOTE_B6;
+        toneNum = NOTE_B5;
       }
-      else if (c == 0)
-      {
-        toneNum = NOTE_A6;
-      }
+      // else if (c == 0)
+      // {
+      //   toneNum = NOTE_A6;
+      // }
     }
-    else if (loopCount == 2 && line == 'A')
+    else if (loopCount == 2)// && line == 'A')
     {
       if (c == 0b1)
       {
-        toneNum = NOTE_C5;
+        toneNum = NOTE_C6;
       }
       else if (c >= 0b10 && c < 0b100)
       {
-        toneNum = NOTE_CS5;
+        toneNum = NOTE_CS6;
       }
       else if (c >= 0b100 && c < 0b1000)
       {
-        toneNum = NOTE_D5;
+        toneNum = NOTE_D6;
       }
       // else if (c == 0)
       // {
       //   toneNum = NOTE_A5;
       // }
-    }
-    else if (loopCount == 2 && line == 'E')
-    {
+    // }
+    // else if (loopCount == 2);// && line == 'E')
+    // {
       if (c >= 0b1000 && c < 0b10000) // 4ビット目をチェック
       {
         toneNum = NOTE_F5;
@@ -244,14 +244,14 @@ void loop()
       {
         toneNum = NOTE_GS5;
       }
-      else if (c == 0)
-      {
-        toneNum = NOTE_E5;
-      }
+      // else if (c == 0)
+      // {
+      //   toneNum = NOTE_E5;
+      // }
     }
-    else if (loopCount == 3 && line == 'E')
+    else if (loopCount == 3)// && line == 'E')
     {
-      if (c == 0b100)
+      if (c == 0b101)
       {
         toneNum = NOTE_A5;
       }
@@ -281,11 +281,32 @@ void loop()
     synth.setNoteOn(0, toneNum, 127);
     lasttoneNum = toneNum;
     sustain = true;
+
+    // MIDIメッセージを送信
+    USBSerial.write(0x90); // Note On
+    USBSerial.write(toneNum); // ノート番号
+    USBSerial.write(127); // ベロシティ
+  }
+  else if (sustain && toneNum != lasttoneNum)
+  {
+    synth.setNoteOff(0, lasttoneNum, 0);
+    synth.setNoteOn(0, toneNum, 127);
+    lasttoneNum = toneNum;
+
+    // MIDIメッセージを送信
+    USBSerial.write(0x90); // Note On
+    USBSerial.write(toneNum); // ノート番号
+    USBSerial.write(127); // ベロシティ
   }
   else if (sustain && aveDiff == 0)
   {
     synth.setNoteOff(0, lasttoneNum, 0);
     sustain = false;
+
+    // MIDIメッセージを送信
+    USBSerial.write(0x80); // Note Off
+    USBSerial.write(lasttoneNum); // ノート番号
+    USBSerial.write(0); // ベロシティ
   }
 
   delay(10);
