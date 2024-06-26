@@ -30,7 +30,7 @@ void readEncoderTask(void *parameter) {
     }
     // キューにdiffの値を保存
     diffValues.push_back(diff);
-    if (diffValues.size() > 10) {
+    if (diffValues.size() > 6) {
       diffValues.erase(diffValues.begin()); // キューが最大サイズを超えたら、最初の値を削除
     }
     // USBSerial.println(encoderValue); // シリアルモニタに表示
@@ -49,9 +49,9 @@ void readEncoderTask(void *parameter) {
 static int toneNum = 0;
 static int lasttoneNum = 0;
 
-static char line = 'i';
-bool sw_R = false;
-bool sw_L = false;
+// static char line = 'i';
+// bool sw_R = false;
+// bool sw_L = false;
 
 
 #include <M5UnitSynth.h>
@@ -293,7 +293,7 @@ void loop()
     synth.setNoteOn(0, toneNum, 127);
     lasttoneNum = toneNum;
 
-    // MIDIメッセージを送信
+    // // MIDIメッセージを送信
     USBSerial.write(0x90); // Note On
     USBSerial.write(toneNum); // ノート番号
     USBSerial.write(127); // ベロシティ
@@ -303,11 +303,11 @@ void loop()
     synth.setNoteOff(0, lasttoneNum, 0);
     sustain = false;
 
-    // MIDIメッセージを送信
+    // // MIDIメッセージを送信
     USBSerial.write(0x80); // Note Off
     USBSerial.write(lasttoneNum); // ノート番号
     USBSerial.write(0); // ベロシティ
   }
 
-  delay(10);
+  delay(11);
 }
