@@ -1,0 +1,5 @@
+{
+    "configuration": "clock=24internal,usb_settings=usbcdc,bootloader_pin=p46",
+    "board": "CH55xDuino:mcs51:ch559",
+    "sketch": "ch559ino\\ch559ino.ino"
+}
