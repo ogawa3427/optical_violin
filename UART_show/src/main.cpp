@@ -8,6 +8,22 @@
 // hahaha
 static int INSTRUMENT_ = 41;
 
+enum states
+{
+  NTH0,
+  NTH1,
+  ON,
+  OFF,
+  CHG
+};
+
+states state = NTH0;
+bool goSign = false;
+
+uint32_t timeKeep = 0;
+uint32_t pastTime = 0;
+int SUS_BORDER = 100;
+
 // struct NowState
 // {
 //   int note;
@@ -31,7 +47,6 @@ uint32_t timer = 0;
 int currentNote = 0;
 int pastNote = 0;
 
-int SUS_BORDER = 100;
 bool hold = false;
 bool pastHold = false;
 // 0 音を出さない
@@ -50,22 +65,6 @@ void updateNote()
   }
 }
 
-// グローバル変数
-volatile bool timeoutFlag = false;
-unsigned long timeoutPeriod = 10000; // 10秒
-
-// タイマーを管理するタスク
-void timerTask(void *parameter) {
-  unsigned long lastTime = millis();
-  while (true) {
-    if (millis() - lastTime > timeoutPeriod) {
-      timeoutFlag = true;
-      lastTime = millis();
-    }
-    vTaskDelay(100 / portTICK_PERIOD_MS); // 100msごとにチェック
-  }
-}
-
 void setup()
 {
   // UARTを初期化 (TX:GPIO1, RX:GPIO2を使用する例)
@@ -77,15 +76,11 @@ void setup()
   synth.setNoteOn(0, NOTE_C6, VOLUME);
   delay(1000);
   synth.setNoteOff(0, NOTE_C6, 0);
-
-  // タイマータスクを作成
-  xTaskCreate(timerTask, "Timer Task", 2048, NULL, 1, NULL);
 }
 
 void loop()
 {
-  bool onNow = false;
-  bool offNow = false;
+  timeKeep = millis();
   // UARTでデータを受信
   if (Serial2.available())
   {
@@ -113,14 +108,12 @@ void loop()
       if (byte19 == 0xFF && byte5 == 0x02)
       {
         USBSerial.print("UpScr");
-        timer = 0;
-        timeoutFlag = false; // タイマーをリセット
+        pastTime = timeKeep;
       }
       else if (byte19 == 0x01 && byte5 == 0x02)
       {
         USBSerial.print("DownScr");
-        timer = 0;
-        timeoutFlag = false; // タイマーをリセット
+        pastTime = timeKeep;
       }
       else if (byte5 == 0x06)
       {
@@ -168,72 +161,105 @@ void loop()
         USBSerial.print(byte15, HEX);
         currentNote = tonedict[byte15];
       }
-      USBSerial.println();
-      USBSerial.print("CurrentNote:");
-      USBSerial.print(currentNote);
-      USBSerial.print(" PastNote:");
-      USBSerial.print(pastNote);
-      USBSerial.print(" Hold:");
-      USBSerial.print(hold);
-      USBSerial.print(" pastHold:");
-      USBSerial.print(pastHold);
-      USBSerial.println();
+      // USBSerial.println();
+      // USBSerial.print("CurrentNote:");
+      // USBSerial.print(currentNote);
+      // USBSerial.print(" PastNote:");
+      // USBSerial.print(pastNote);
+      // USBSerial.print(" Hold:");
+      // USBSerial.print(hold);
+      // USBSerial.print(" pastHold:");
+      // USBSerial.print(pastHold);
+      // USBSerial.println();
     }
   }
-  timer++;
-  bool valBow = true;
-  if ((timer > SUS_BORDER))
+  goSign = timeKeep - pastTime < SUS_BORDER && currentNote != 0;
+
+  switch (state)
   {
-    timer = SUS_BORDER + 1;
-    valBow = false;
-  }
-  // USBSerial.print("Timer:");
-  // USBSerial.println(timer);
-  // else
-  // {
-  //   hold = true;
-  // }
-
-  // USBSerial.print("valBow:");
-  // USBSerial.print(valBow);
-  // USBSerial.print(" pastBow:");
-  // USBSerial.println(pastBow);
-  USBSerial.print("Timer:");
-  USBSerial.println(timer);
-
-  // タイムアウトフラグが立っている場合、音を鳴らさない
-  if (timeoutFlag) {
-    // 音を鳴らさない処理
-    synth.setNoteOff(0, currentNote, VOLUME);
-  }
-
-  if ((currentNote != 0 && pastNote == 0 && valBow) || (currentNote != 0 && valBow && !pastBow))
-  {
-    synth.setNoteOff(0, pastNote, VOLUME);
-    if (currentNote != 0) {
-      synth.setNoteOn(0, currentNote, VOLUME);
+  case NTH0:
+    if (goSign)
+    {
+      state = ON;
     }
-    // USBSerial.print("NoteOn");
-    // USBSerial.println(currentNote);
-  }
-  else if (!hold && pastHold || timer > SUS_BORDER)
-  {
-    synth.setNoteOff(0, currentNote, VOLUME);
-    // USBSerial.println("NoteOff");
-  }
-  else if (hold && pastHold && currentNote != pastNote)
-  {
-    synth.setNoteOff(0, pastNote, VOLUME);
-    if (currentNote != 0) {
-      synth.setNoteOn(0, currentNote, VOLUME);
+    else
+    {
+      state = NTH0;
     }
-    // USBSerial.print("NoteOff");
-    // USBSerial.print(pastNote);
-    // USBSerial.print("NoteOn");
-    // USBSerial.println(currentNote);
+    break;
+  case NTH1:
+    if (goSign)
+    {
+      state = NTH1;
+    }
+    else
+    {
+      state = OFF;
+    }
+    break;
+  case ON:
+    synth.setNoteOn(0, currentNote, VOLUME);
+    if (goSign)
+    {
+      if (currentNote != pastNote)
+      {
+        state = CHG;
+      }
+      else
+      {
+        state = NTH1;
+      }
+    }
+    else
+    {
+      state = OFF;
+    }
+    break;
+
+  case OFF:
+    synth.setNoteOff(0, pastNote, 0);
+    if (goSign)
+    {
+      state = ON;
+    }
+    else
+    {
+      state = NTH0;
+    }
+    break;
+  case CHG:
+    synth.setNoteOff(0, pastNote, 0);
+    synth.setNoteOn(0, currentNote, VOLUME);
+    if (goSign)
+    {
+      if (currentNote != pastNote)
+      {
+        state = CHG;
+      }
+      else
+      {
+        state = NTH1;
+      }
+    }
+    else
+    {
+      state = OFF;
+    }
+    break;
   }
+  USBSerial.print(timeKeep - pastTime);
+  USBSerial.print(" ");
+  USBSerial.print("CurrentNote:");
+  USBSerial.print(currentNote);
+  USBSerial.print(" ");
+  USBSerial.print("isNotPassed");
+  USBSerial.print(" ");
+  USBSerial.print(timeKeep - pastTime < SUS_BORDER);
+  USBSerial.print(" ");
+  USBSerial.print("GoSign:");
+  USBSerial.print(" ");
+  USBSerial.println(goSign);
   pastHold = hold;
-  pastBow = valBow;
-
+  // pastBow = valBow;
   // delay(1);
 }
