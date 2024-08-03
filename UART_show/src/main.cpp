@@ -1,8 +1,10 @@
-
 #include <Arduino.h>
 #include <M5UnitSynth.h>
 #include <note.h>
 #include <tone.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 // hahaha
 static int INSTRUMENT_ = 41;
 
@@ -48,6 +50,22 @@ void updateNote()
   }
 }
 
+// グローバル変数
+volatile bool timeoutFlag = false;
+unsigned long timeoutPeriod = 10000; // 10秒
+
+// タイマーを管理するタスク
+void timerTask(void *parameter) {
+  unsigned long lastTime = millis();
+  while (true) {
+    if (millis() - lastTime > timeoutPeriod) {
+      timeoutFlag = true;
+      lastTime = millis();
+    }
+    vTaskDelay(100 / portTICK_PERIOD_MS); // 100msごとにチェック
+  }
+}
+
 void setup()
 {
   // UARTを初期化 (TX:GPIO1, RX:GPIO2を使用する例)
@@ -59,6 +77,9 @@ void setup()
   synth.setNoteOn(0, NOTE_C6, VOLUME);
   delay(1000);
   synth.setNoteOff(0, NOTE_C6, 0);
+
+  // タイマータスクを作成
+  xTaskCreate(timerTask, "Timer Task", 2048, NULL, 1, NULL);
 }
 
 void loop()
@@ -93,11 +114,13 @@ void loop()
       {
         USBSerial.print("UpScr");
         timer = 0;
+        timeoutFlag = false; // タイマーをリセット
       }
       else if (byte19 == 0x01 && byte5 == 0x02)
       {
         USBSerial.print("DownScr");
         timer = 0;
+        timeoutFlag = false; // タイマーをリセット
       }
       else if (byte5 == 0x06)
       {
@@ -177,6 +200,12 @@ void loop()
   // USBSerial.println(pastBow);
   USBSerial.print("Timer:");
   USBSerial.println(timer);
+
+  // タイムアウトフラグが立っている場合、音を鳴らさない
+  if (timeoutFlag) {
+    // 音を鳴らさない処理
+    synth.setNoteOff(0, currentNote, VOLUME);
+  }
 
   if ((currentNote != 0 && pastNote == 0 && valBow) || (currentNote != 0 && valBow && !pastBow))
   {
