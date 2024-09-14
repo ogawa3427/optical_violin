@@ -255,6 +255,10 @@ void loop()
       {
         toneNum = NOTE_A5;
       }
+      else if (c == 0b11101)
+      {
+        toneNum = NOTE_A5;
+      }
       else
       {
         toneNum = toneNum;
@@ -264,6 +268,12 @@ void loop()
       //   toneNum = NOTE_E5;
       // }
     }
+    // USBSerial.print(c, BIN);
+    // USBSerial.print(" ");
+    // if (loopCount == 3)
+    // {
+    //   USBSerial.println();
+    // }
     loopCount++;
   }
 
@@ -283,9 +293,9 @@ void loop()
     sustain = true;
 
     // MIDIメッセージを送信
-    USBSerial.write(0x90); // Note On
-    USBSerial.write(toneNum); // ノート番号
-    USBSerial.write(127); // ベロシティ
+    // USBSerial.write(0x90); // Note On
+    // USBSerial.write(toneNum); // ノート番号
+    // USBSerial.write(127); // ベロシティ
   }
   else if (sustain && toneNum != lasttoneNum)
   {
@@ -311,3 +321,5 @@ void loop()
 
   delay(11);
 }
+
+
