@@ -289,7 +289,7 @@ int instrument = 41;
 
 M5UnitSynth synth;
 
-int VOLUME = 60;
+int VOLUME = 127;
 
 uint32_t timer = 0;
 
@@ -330,15 +330,15 @@ void setup()
   synth.setNoteOff(0, NOTE_C6, 0);
 
   // NVSの初期化
-  esp_err_t err = nvs_flash_init();
-  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
-  {
-    ESP_ERROR_CHECK(nvs_flash_erase());
-    err = nvs_flash_init();
-  }
-  ESP_ERROR_CHECK(err);
+  // esp_err_t err = nvs_flash_init();
+  // if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+  // {
+  //   ESP_ERROR_CHECK(nvs_flash_erase());
+  //   err = nvs_flash_init();
+  // }
+  // ESP_ERROR_CHECK(err);
 
-  int32_t restart_counter = 0;
+  // int32_t restart_counter = 0;
   // readNVS("restart_counter", restart_counter);
   // writeNVS("restart_counter", restart_counter);
 
@@ -354,10 +354,12 @@ void setup()
   // M5.Lcd.printf("Restart= %" PRIu32 "\n", restart_counter);
 
   // outerState = ASK_CTR_KEY_CFG;
-  CtrKeyCfg ctrKeyCfg = readCtrKeyCfg();
+  // CtrKeyCfg ctrKeyCfg = readCtrKeyCfg();
   // cfg_ = askCtrKeyCfg();
   outerState = ASK_CTR_KEY_CFG;
 }
+
+// CtrKeyCfg ctrKeyCfg;
 
 // 変数の初期化部分に過去の値を保存するための変数を追加
 uint32_t pastTimeKeep = 0;
@@ -403,7 +405,12 @@ bool compareReceivedData(const String &receivedData, const String &cfgData)
 
 void loop()
 {
-  // OuterStates outerState = MAIN;
+    if (timeKeep % 1000 == 0)
+    {
+      USBSerial.println(timeKeep);
+    }
+    
+  OuterStates outerState = MAIN;
   if (outerState == ASK_CTR_KEY_CFG)
   {
     timeKeep = millis();
@@ -615,16 +622,22 @@ void loop()
   else if (outerState == MAIN)
   {
     timeKeep = millis();
-    if (timeKeep % 1000 == 0)
-    {
-      USBSerial.println(timeKeep);
-    }
+    // if (timeKeep % 1000 == 0)
+    // {
+    //   USBSerial.println(timeKeep);
+    // }
     // UARTでデータを受信
     if (Serial2.available())
     {
       String receivedData = Serial2.readStringUntil('\n');
+      for (int i = 0; i < receivedData.length(); i++)
+      {
+        USBSerial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
+        USBSerial.print(" ");                  // 数字の間にスペースを入れる
+      }
+      USBSerial.println(); // 改行を出力
       // 受信したデータの15バイト目と19バイト目を表示
-      USBSerial.println("Received Data:");
+      // USBSerial.println("Received Data:");
       if (true) //(receivedData.length() >= 19)
       {
         char byte5 = receivedData[4];
@@ -646,8 +659,8 @@ void loop()
         timeStamp_LastReceive = timeKeep;
         if (delta > 25)
         {
-          USBSerial.print("---------------------------------");
-          USBSerial.println(delta);
+          // USBSerial.print("---------------------------------");
+          // USBSerial.println(delta);
         }
         for (int i = 0; i < receivedData.length(); i++)
         {
@@ -656,18 +669,19 @@ void loop()
         }
         // USBSerial.println(); // 改行を出力
         hold = true;
-        if (byte19 == 0xFF && byte5 == 0x02)
-        {
-          // USBSerial.print("UpScr");
-          pastTime = timeKeep;
-        }
-        else if (byte19 == 0x01 && byte5 == 0x02)
-        {
-          // USBSerial.print("DownScr");
-          pastTime = timeKeep;
-        }
+        // if (byte17 == 0xFF && byte5 == 0x03)
+        // {
+        //   // USBSerial.print("UpScr");
+        //   pastTime = timeKeep;
+        // }
+        // else if (byte17 == 0x01 && byte5 == 0x03)
+        // {
+        //   // USBSerial.print("DownScr");
+        //   pastTime = timeKeep;
+        // }
         // ここに新しい条件を追加
-        else if (byte5 == 0x00 && byte15 == 0x00 && byte16 == 0xFF && byte17 == 0x00)
+        if (byte5 == 0x00 && byte15 == 0x00 && byte16 == 0xFF && byte17 == 0x00)
+        // else if (byte5 == 0x00 && byte15 == 0x00 && byte16 == 0xFF && byte17 == 0x00)
         {
           // USBSerial.print("UpScr");
           pastTime = timeKeep;
@@ -679,12 +693,15 @@ void loop()
         }
         else if (byte5 == 0x06)
         {
+          M5.Lcd.setCursor(0, 0);
+          M5.Lcd.fillScreen(BLACK);
           if (byte15 == 0x00 && byte16 == 0x00 && byte17 == 0x00 && byte18 == 0x00)
           {
             // USBSerial.print("OFF");
             hold = false;
             updateNote();
             currentNote = 0;
+            M5.Lcd.println("OFF");
           }
           else if (byte15 != 0x00 && byte16 == 0x00 && byte17 == 0x00 && byte18 == 0x00)
           {
@@ -693,6 +710,7 @@ void loop()
             currentNote = tonedict[byte15];
             pastByte15 = byte15;
             pastByte16 = byte16;
+            M5.Lcd.println("ON");
           }
           else if (byte15 == 0x00 && byte16 != 0x00 && byte17 == 0x00 && byte18 == 0x00)
           {
@@ -701,6 +719,7 @@ void loop()
             currentNote = tonedict[byte16];
             pastByte15 = byte15;
             pastByte16 = byte16;
+            M5.Lcd.println("ON2");
           }
           else if (byte15 != 0x00 && byte16 != 0x00 && byte17 == 0x00 && byte18 == 0x00)
           {
@@ -716,12 +735,25 @@ void loop()
               pastNote = currentNote;
               currentNote = tonedict[byte16];
             }
+            M5.Lcd.println("ON3");
           }
         }
         else if (byte19 == 0x00 && byte15 != 0x00 && byte5 == 0x06 && byte17 == 0x00 && byte18 == 0x00)
         {
           // USBSerial.print(byte15, HEX);
           currentNote = tonedict[byte15];
+          M5.Lcd.println("ON4");
+        }
+
+        if (receivedData[1] == 0x07 && receivedData[16] == 0x01)
+        {
+          // USBSerial.print("UpBow");
+          pastTime = timeKeep;
+        }
+        else if (receivedData[1] == 0x07 && receivedData[16] == 0xFF)
+        {
+          // USBSerial.print("DownBow");
+          pastTime = timeKeep;
         }
         // USBSerial.println();
         // USBSerial.print("CurrentNote:");
@@ -833,8 +865,8 @@ void loop()
                       (state != pastState);
 
     // 変化があった場合のみ出力
-    // if (hasChanged)
-    if (false)
+    if (hasChanged)
+    // if (false)
     {
       USBSerial.print(num++);
       USBSerial.print(" ");
