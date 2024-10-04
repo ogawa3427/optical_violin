@@ -16,11 +16,11 @@ void readNVS(const char *key, String &value)
   esp_err_t err = nvs_open("storage", NVS_READWRITE, &my_handle);
   if (err != ESP_OK)
   {
-    USBSerial.printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+    USBSerial.printf("[READ]Error (%s) opening NVS handle!\n", esp_err_to_name(err));
   }
   else
   {
-    USBSerial.println("NVS handle opened successfully");
+    USBSerial.println("[READ]NVS handle opened successfully");
 
     size_t required_size = 0; // valueのサイズを取得するための変数
     err = nvs_get_str(my_handle, key, NULL, &required_size);
@@ -35,29 +35,29 @@ void readNVS(const char *key, String &value)
       }
       else
       {
-        USBSerial.printf("Error (%s) reading %s!\n", esp_err_to_name(err), key);
+        USBSerial.printf("[READ]Error (%s) reading %s!\n", esp_err_to_name(err), key);
       }
       delete[] buffer;
     }
     else if (err == ESP_ERR_NVS_NOT_FOUND)
     {
-      USBSerial.printf("The value for %s is not initialized yet!\n", key);
+      USBSerial.printf("[READ]The value for %s is not initialized yet!\n", key);
     }
     else
     {
-      USBSerial.printf("Error (%s) reading %s!\n", esp_err_to_name(err), key);
+      USBSerial.printf("[READ]Error (%s) reading %s!\n", esp_err_to_name(err), key);
     }
-
     nvs_close(my_handle);
   }
 }
 
-void storeReceivedData(const String &receivedData, String &key)
-{
-  key = receivedData;
-  USBSerial.printf("Stored data for key: %s\n", key.c_str());
-  USBSerial.printf("Value: %s\n", receivedData.c_str());
-}
+// void storeReceivedData(const String &receivedData, String &key)
+// {
+//   key = receivedData;
+//   USBSerial.printf("Stored data for key: %s\n", key.c_str());
+//   USBSerial.printf("Value: %s\n", receivedData.c_str());
+// }
+
 void writeNVS(const char *key, const String &value)
 {
   nvs_handle_t my_handle;
@@ -67,29 +67,52 @@ void writeNVS(const char *key, const String &value)
     err = nvs_set_str(my_handle, key, value.c_str());
     if (err != ESP_OK)
     {
-      USBSerial.printf("Failed to update value for key: %s, error: %s\n", key, esp_err_to_name(err));
+      USBSerial.printf("[WRITE]Failed to update value for key: %s, error: %s\n", key, esp_err_to_name(err));
     }
     else
     {
-      USBSerial.printf("Value updated successfully for key: %s\n", key);
+      USBSerial.printf("[WRITE]Value updated successfully for key: %s\n", key);
     }
 
     err = nvs_commit(my_handle);
+    USBSerial.println("[WRITE]Committing updates in NVS ...");
     if (err != ESP_OK)
     {
-      USBSerial.printf("Failed to commit updates for key: %s, error: %s\n", key, esp_err_to_name(err));
+      USBSerial.printf("[WRITE]Failed to commit updates for key: %s, error: %s\n", key, esp_err_to_name(err));
     }
     else
     {
-      USBSerial.printf("Updates committed successfully for key: %s\n", key);
+      USBSerial.printf("[WRITE]Updates committed successfully for key: %s\n", key);
     }
 
     nvs_close(my_handle);
   }
   else
   {
-    USBSerial.printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+    USBSerial.printf("[WRITE]Error (%s) opening NVS handle!\n", esp_err_to_name(err));
   }
+}
+
+void printAsHEX(const String &receivedData)
+{
+  for (int i = 0; i < receivedData.length(); i++)
+  {
+    USBSerial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
+    USBSerial.print(" ");                  // 数字の間にスペースを入れる
+  }
+  USBSerial.println(); // 改行を出力
+}
+
+bool compare(const String &receivedData, const String &rootString)
+{
+  for (int i = 0; i < receivedData.length(); i++)
+  {
+    if (receivedData[i] != rootString[i])
+    {
+      return false;
+    }
+  }
+  return true;
 }
 
 struct CtrKeyCfg
@@ -329,18 +352,40 @@ void setup()
   delay(1000);
   synth.setNoteOff(0, NOTE_C6, 0);
 
-  // NVSの初期化
-  // esp_err_t err = nvs_flash_init();
-  // if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
-  // {
-  //   ESP_ERROR_CHECK(nvs_flash_erase());
-  //   err = nvs_flash_init();
-  // }
-  // ESP_ERROR_CHECK(err);
+  // Initialize NVS
+  esp_err_t err = nvs_flash_init();
+  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+  {
+    // OTA app partition table has a smaller NVS partition size than the non-OTA
+    // partition table. This size mismatch may cause NVS initialization to fail.
+    // If this happens, we erase NVS partition and initialize NVS again.
+    // Once NVS is initialized, OTA app partition table will be used
+    // regardless of the partition table in use.
+    err = nvs_flash_erase();
+    if (err != ESP_OK)
+    {
+      USBSerial.printf("Failed to erase NVS, error: %s\n", esp_err_to_name(err));
+    }
+    else
+    {
+      err = nvs_flash_init();
+      if (err != ESP_OK)
+      {
+        USBSerial.printf("Failed to initialize NVS, error: %s\n", esp_err_to_name(err));
+      }
+    }
+  }
+  else if (err != ESP_OK)
+  {
+    USBSerial.printf("Failed to initialize NVS, error: %s\n", esp_err_to_name(err));
+  }
 
-  // int32_t restart_counter = 0;
-  // readNVS("restart_counter", restart_counter);
-  // writeNVS("restart_counter", restart_counter);
+  String value;
+  readNVS("key", value);
+  if (value == "")
+  {
+    writeNVS("key", "value");
+  }
 
   auto cfg = M5.config();
   M5.begin(cfg);
@@ -355,6 +400,7 @@ void setup()
 
   // outerState = ASK_CTR_KEY_CFG;
   // CtrKeyCfg ctrKeyCfg = readCtrKeyCfg();
+  ctrKeyCfg = readCtrKeyCfg();
   // cfg_ = askCtrKeyCfg();
   outerState = ASK_CTR_KEY_CFG;
 }
@@ -367,50 +413,15 @@ int pastCurrentNote = 0;
 bool pastGoSign = false;
 int num = 0;
 
-
-void printAsHEX(const String &receivedData)
-{
-  for (int i = 0; i < receivedData.length(); i++)
-  {
-    USBSerial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
-    USBSerial.print(" ");                  // 数字の間にスペースを入れる
-  }
-  USBSerial.println(); // 改行を出力
-}
-
-bool compareReceivedData(const String &receivedData, const String &cfgData)
-{
-  USBSerial.println("Comparing received data with cfg data:");
-  USBSerial.print("Received: ");
-  printAsHEX(receivedData);
-  USBSerial.print("Config  : ");
-  printAsHEX(cfgData);
-
-  if (receivedData.length() != cfgData.length())
-  {
-    USBSerial.println("Length mismatch");
-    return false;
-  }
-
-  for (int i = 0; i < receivedData.length(); i++)
-  {
-    if (receivedData[i] != cfgData[i])
-    {
-      USBSerial.printf("Mismatch at index %d: received %02X, expected %02X\n", i, receivedData[i], cfgData[i]);
-      return false;
-    }
-  }
-  return true;
-}
-
 void loop()
 {
-    if (timeKeep % 1000 == 0)
-    {
-      USBSerial.println(timeKeep);
-    }
-    
-  OuterStates outerState = MAIN;
+  // if (timeKeep % 1000 == 0)
+  // {
+  //   USBSerial.println(timeKeep);
+  // }
+
+  OuterStates outerState = ASK_CTR_KEY_CFG;
+  String hexString = "";
   if (outerState == ASK_CTR_KEY_CFG)
   {
     timeKeep = millis();
@@ -420,6 +431,16 @@ void loop()
     {
       receivedData = Serial2.readStringUntil('\n');
     }
+
+    for (int i = 0; i < receivedData.length(); i++)
+    {
+      char hex[3];
+      sprintf(hex, "%02X", receivedData[i]);
+      hexString += hex;
+    }
+
+    // USBSerial.print("Received Data: ");
+    // USBSerial.println(hexString);
 
     static int lastPhase = -1; // 前回のフェーズを記録する変数
 
@@ -458,8 +479,7 @@ void loop()
         M5.Lcd.println("Check cfg\nRetry: BtnB\nOK: BtnA");
         break;
       case 9:
-        String msg = receivedData;
-        msg.trim();
+        String msg = hexString;
         M5.Lcd.println(msg);
       }
       M5.Lcd.endWrite();
@@ -468,123 +488,118 @@ void loop()
 
     if (receivedData != "")
     {
-      receivedData.trim(); // 受信データの前後の空白をトリム
       USBSerial.print("Phase: ");
       USBSerial.println(ctrKeyPhase);
       switch (ctrKeyPhase)
       {
       case 0:
-        for (int i = 0; i < ctrKeyCfg.enter.length(); i++)
-        {
-          USBSerial.print(ctrKeyCfg.enter[i], HEX);
-          USBSerial.print(" ");
-        }
-        USBSerial.println();
+      USBSerial.println("Received: ");
+        USBSerial.println(hexString);
+        
         for (int i = 0; i < ctrKeyCfg.esc.length(); i++)
         {
           USBSerial.print(ctrKeyCfg.esc[i], HEX);
-          USBSerial.print(" ");
+          // USBSerial.print(" ");
         }
         USBSerial.println();
         USBSerial.println("Phase 0 compairing...");
-        if (compareReceivedData(receivedData, ctrKeyCfg.esc))
-        {
+        if (compare(hexString, ctrKeyCfg.esc))
+        { 
+          USBSerial.println("Esc-------------------");
           ctrKeyPhase = 8;
           break;
         }
         else
         {
-          storeReceivedData(receivedData, ctrKeyCfg.enter);
+          ctrKeyCfg.enter = hexString;
           ctrKeyPhase++;
           break;
         }
       case 1:
-        storeReceivedData(receivedData, ctrKeyCfg.pull_enter);
+        ctrKeyCfg.pull_enter = hexString;
         ctrKeyPhase++;
         break;
       case 2:
-        storeReceivedData(receivedData, ctrKeyCfg.up);
+        ctrKeyCfg.up = hexString;
         ctrKeyPhase++;
         break;
       case 3:
-        storeReceivedData(receivedData, ctrKeyCfg.pull_up);
+        ctrKeyCfg.pull_up = hexString;
         ctrKeyPhase++;
         break;
       case 4:
-        storeReceivedData(receivedData, ctrKeyCfg.down);
+        ctrKeyCfg.down = hexString;
         ctrKeyPhase++;
         break;
       case 5:
-        storeReceivedData(receivedData, ctrKeyCfg.pull_down);
+        ctrKeyCfg.pull_down = hexString;
         ctrKeyPhase++;
         break;
       case 6:
-        storeReceivedData(receivedData, ctrKeyCfg.esc);
+        ctrKeyCfg.esc = hexString;
         ctrKeyPhase++;
         break;
       case 7:
-        storeReceivedData(receivedData, ctrKeyCfg.pull_esc);
+        ctrKeyCfg.pull_esc = hexString;
         USBSerial.println("Check cfg");
         ctrKeyPhase++;
         break;
       case 8:
         M5.Lcd.setCursor(0, 0);
         M5.Lcd.fillScreen(BLACK);
-        // for (int i = 0; i < receivedData.length(); i++)
-        // {
-        //   M5.Lcd.print(receivedData[i], HEX);
-        //   M5.Lcd.print(" ");
-        // }
-        // M5.Lcd.println();
-        // if (compareReceivedData(receivedData, ctrKeyCfg.enter))
-        // {
-        // // if (false)
-        // //{
-        //   USBSerial.println("Enter-----------------");
-        // }
-        // else if (compareReceivedData(receivedData, ctrKeyCfg.pull_enter))
-        // {
-        //   USBSerial.println("Pull Enter------------");
-        // }
-        // else if (compareReceivedData(receivedData, ctrKeyCfg.up))
-        // {
-        //   USBSerial.println("Up--------------------");
-        // }
-        // else if (compareReceivedData(receivedData, ctrKeyCfg.pull_up))
-        // {
-        //   USBSerial.println("Pull Up---------------");
-        // }
-        // else if (compareReceivedData(receivedData, ctrKeyCfg.down))
-        // {
-        //   USBSerial.println("Down------------------");
-        // }
-        // else if (compareReceivedData(receivedData, ctrKeyCfg.pull_down))
-        // {
-        //   USBSerial.println("Pull Down-------------");
-        // }
-        // else if (compareReceivedData(receivedData, ctrKeyCfg.esc))
-        // {
-        //   USBSerial.println("Esc-------------------");
-        // }
-        // else if (compareReceivedData(receivedData, ctrKeyCfg.pull_esc))
-        // {
-        //   USBSerial.println("Pull Esc--------------");
-        // }
-        // else
-        // {
-        //   USBSerial.println("Unknown");
-        //   USBSerial.println(receivedData);
-        //   USBSerial.println(ctrKeyCfg.enter);
-        //   USBSerial.println(ctrKeyCfg.pull_enter);
-        //   USBSerial.println(ctrKeyCfg.up);
-        //   USBSerial.println(ctrKeyCfg.pull_up);
-        //   USBSerial.println(ctrKeyCfg.down);
-        //   USBSerial.println(ctrKeyCfg.pull_down);
-        //   USBSerial.println(ctrKeyCfg.esc);
-        //   USBSerial.println(ctrKeyCfg.pull_esc);
-        // }
-        USBSerial.print("Received  : ");
-        printAsHEX(receivedData);
+        for (int i = 0; i < hexString.length(); i++)
+        {
+          M5.Lcd.print(hexString[i], HEX);
+          M5.Lcd.print(" ");
+        }
+        M5.Lcd.println();
+        if (compare(hexString, ctrKeyCfg.enter))
+        {
+          USBSerial.println("Enter-----------------");
+        }
+        else if (compare(hexString, ctrKeyCfg.pull_enter))
+        {
+          USBSerial.println("Pull Enter------------");
+        }
+        else if (compare(hexString, ctrKeyCfg.up))
+        {
+          USBSerial.println("Up--------------------");
+        }
+        else if (compare(hexString, ctrKeyCfg.pull_up))
+        {
+          USBSerial.println("Pull Up---------------");
+        }
+        else if (compare(hexString, ctrKeyCfg.down))
+        {
+          USBSerial.println("Down------------------");
+        }
+        else if (compare(hexString, ctrKeyCfg.pull_down))
+        {
+          USBSerial.println("Pull Down-------------");
+        }
+        else if (compare(hexString, ctrKeyCfg.esc))
+        {
+          USBSerial.println("Esc-------------------");
+        }
+        else if (compare(hexString, ctrKeyCfg.pull_esc))
+        {
+          USBSerial.println("Pull Esc--------------");
+        }
+        else
+        {
+          USBSerial.println("Unknown");
+          USBSerial.println(hexString);
+          USBSerial.println(ctrKeyCfg.enter);
+          USBSerial.println(ctrKeyCfg.pull_enter);
+          USBSerial.println(ctrKeyCfg.up);
+          USBSerial.println(ctrKeyCfg.pull_up);
+          USBSerial.println(ctrKeyCfg.down);
+          USBSerial.println(ctrKeyCfg.pull_down);
+          USBSerial.println(ctrKeyCfg.esc);
+          USBSerial.println(ctrKeyCfg.pull_esc);
+        }
+        // USBSerial.print("Received  : ");
+        // printAsHEX(hexString);
         // USBSerial.print("Enter     : ");
         // printAsHEX(ctrKeyCfg.enter);
         // USBSerial.print("Pull Enter: ");
@@ -594,12 +609,14 @@ void loop()
     }
     if (ctrKeyPhase == 8)
     {
+      USBSerial.println("ctrKeyPhase == 8");
       M5.update();
       if (M5.BtnA.wasPressed())
       {
         M5.Lcd.fillScreen(BLACK);
         M5.Lcd.setCursor(0, 0);
         M5.Lcd.println("Writing to NVS...");
+        USBSerial.println("Writing to NVS...");
         writeNVS("ctrKeyCfg_enter", ctrKeyCfg.enter);
         writeNVS("ctrKeyCfg_up", ctrKeyCfg.up);
         writeNVS("ctrKeyCfg_down", ctrKeyCfg.down);
@@ -612,6 +629,18 @@ void loop()
         ctrKeyPhase = 0;
         outerState = BOW;
         M5.Lcd.println("Done!");
+        USBSerial.println("Done!");
+
+        ctrKeyCfg = readCtrKeyCfg();
+        USBSerial.println("ctrKeyCfg:");
+        USBSerial.println(ctrKeyCfg.enter);
+        USBSerial.println(ctrKeyCfg.up);
+        USBSerial.println(ctrKeyCfg.down);
+        USBSerial.println(ctrKeyCfg.esc);
+        USBSerial.println(ctrKeyCfg.pull_enter);
+        USBSerial.println(ctrKeyCfg.pull_up);
+        USBSerial.println(ctrKeyCfg.pull_down);
+        USBSerial.println(ctrKeyCfg.pull_esc);
       }
       else if (M5.BtnB.wasPressed())
       {
@@ -904,5 +933,3 @@ void loop()
     // delay(1);
   }
 }
-
-
