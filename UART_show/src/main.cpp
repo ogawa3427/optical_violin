@@ -160,7 +160,6 @@ CtrKeyCfg ctrKeyCfg;
 uint8_t ctrKeyPhase = 0;
 
 BowingKeyCfg bowingKeyCfg;
-uint8_t bowingKeyPhase = 0;
 
 ToneKeyCfg toneKeyCfg;
 uint8_t toneKeyPhase = 0;
@@ -213,8 +212,13 @@ BowingKeyCfg readBowingKeyCfg()
   cfg.rightClick = String(temp.c_str());
   readNVS("bowingKeyCfg_leftClick", temp);
   cfg.leftClick = String(temp.c_str());
+  readNVS("bowingKeyCfg_pull_rightClick", temp);
+  cfg.pull_rightClick = String(temp.c_str());
+  readNVS("bowingKeyCfg_pull_leftClick", temp);
+  cfg.pull_leftClick = String(temp.c_str());
   return cfg;
 }
+
 
 ToneKeyCfg readToneKeyCfg()
 {
@@ -485,12 +489,12 @@ void setup()
   // cfg_ = askCtrKeyCfg();
   outerState = INIT;
 
-  USBSerial.println("3");
-  delay(1000);
-  USBSerial.println("2");
-  delay(1000);
-  USBSerial.println("1");
-  delay(1000);
+  // USBSerial.println("3");
+  // delay(1000);
+  // USBSerial.println("2");
+  // delay(1000);
+  // USBSerial.println("1");
+  // delay(1000);
   USBSerial.println("0");
   M5.Lcd.fillScreen(BLACK);
   USBSerial.println("Hello!");
@@ -546,7 +550,10 @@ void loop()
       USBSerial.println("START_CTR_KEY_CFG");
       if (compare(hexString, ctrKeyCfg.esc))
       {
-        outerState = MAIN;
+        outerState = MUS_CFG_START;
+        M5.Lcd.fillScreen(BLACK);
+        M5.Lcd.setCursor(0, 0);
+        M5.Lcd.println("To start mouse config [Enter] To skip: [Esc] Be careful not to make signal");
       }
       else
       {
@@ -750,11 +757,34 @@ void loop()
     }
     if (M5.BtnA.wasPressed())
     {
+      writeNVS("bowingKeyCfg_rightClick", bowingKeyCfg.rightClick);
+      writeNVS("bowingKeyCfg_leftClick", bowingKeyCfg.leftClick);
+      writeNVS("bowingKeyCfg_upBow", bowingKeyCfg.upBow);
+      writeNVS("bowingKeyCfg_downBow", bowingKeyCfg.downBow);
+      writeNVS("bowingKeyCfg_pull_rightClick", bowingKeyCfg.pull_rightClick);
+      writeNVS("bowingKeyCfg_pull_leftClick", bowingKeyCfg.pull_leftClick);
+      writeNVS("bowingKeyCfg_pull_upBow", bowingKeyCfg.pull_upBow);
+      writeNVS("bowingKeyCfg_pull_downBow", bowingKeyCfg.pull_downBow);
+
+      bowingKeyCfg = readBowingKeyCfg();
+
+#ifdef USB_SERIAL
+      USBSerial.println("bowingKeyCfg:");
+      USBSerial.println(bowingKeyCfg.rightClick);
+      USBSerial.println(bowingKeyCfg.leftClick);
+      USBSerial.println(bowingKeyCfg.upBow);
+      USBSerial.println(bowingKeyCfg.downBow);
+      USBSerial.println(bowingKeyCfg.pull_rightClick);
+      USBSerial.println(bowingKeyCfg.pull_leftClick);
+      USBSerial.println(bowingKeyCfg.pull_upBow);
+      USBSerial.println(bowingKeyCfg.pull_downBow);
+#endif
+
       outerState = MAIN;
     }
     else if (M5.BtnB.wasPressed())
     {
-      outerState = MAIN;
+      outerState = MUS_CFG_BUF;
     }
   }
   else if (outerState == MAIN)
