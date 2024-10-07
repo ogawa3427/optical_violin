@@ -8,6 +8,8 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 
+#define USB_SERIAL true
+
 // https://github.com/espressif/esp-idf/blob/v5.3/examples/storage/nvs_rw_value/main/nvs_value_example_main.c
 
 void readNVS(const char *key, String &value)
@@ -134,6 +136,8 @@ struct BowingKeyCfg
   String downBow;
   String rightClick;
   String leftClick;
+  String pull_rightClick;
+  String pull_leftClick;
 };
 
 struct ToneKeyCfg
@@ -243,8 +247,19 @@ ToneKeyCfg readToneKeyCfg()
 enum OuterStates
 {
   INIT,
+  START_CTR_KEY_CFG,
   ASK_CTR_KEY_CFG,
+  CONFIRM_CTR_KEY_CFG,
   READ_CTR_KEY_CFG,
+  MUS_CFG_START,
+  MUS_CFG_BUF,
+  ASK_MUS_CFG,
+  CONFIRM_MUS_CFG,
+  READ_MUS_CFG,
+  TONE_CFG_START,
+  ASK_TONE_CFG,
+  CONFIRM_TONE_CFG,
+  READ_TONE_CFG,
   MAIN,
   BOW,
   TONE
@@ -307,6 +322,75 @@ int timeStamp_LastReceive = 0;
 //   int note;
 //   bool valBow;
 // };
+
+int promptBase1_index = 0;
+int promptBase1_lastIndex = 0;
+
+struct promptItem
+{
+  const char *prompt;
+  String *strage;
+};
+
+promptItem promptBase1[] = {{.prompt = "Release [Enter]",
+                             .strage = &ctrKeyCfg.pull_enter},
+                            {.prompt = "Please press and hold [Up]",
+                             .strage = &ctrKeyCfg.up},
+                            {.prompt = "Release [Up]",
+                             .strage = &ctrKeyCfg.pull_up},
+                            {.prompt = "Please press and hold [Down]",
+                             .strage = &ctrKeyCfg.down},
+                            {.prompt = "Release [Down]",
+                             .strage = &ctrKeyCfg.pull_down},
+                            {.prompt = "Please press and hold [Esc]",
+                             .strage = &ctrKeyCfg.esc},
+                            {.prompt = "Release [Esc]",
+                             .strage = &ctrKeyCfg.pull_esc}};
+
+int lengthPromptBase1 = 7;
+
+int promptBase2_index = 0;
+int promptBase2_lastIndex = 0;
+promptItem promptBase2[] = {{.prompt = "Push [R Click] and hold",
+                             .strage = &bowingKeyCfg.rightClick},
+                            {.prompt = "Release [R Click]",
+                             .strage = &bowingKeyCfg.pull_rightClick},
+                            {.prompt = "Push [L Click] and hold",
+                             .strage = &bowingKeyCfg.leftClick},
+                            {.prompt = "Release [L Click]",
+                             .strage = &bowingKeyCfg.pull_leftClick},
+                            {.prompt = "Scroll up once",
+                             .strage = &bowingKeyCfg.upBow},
+                            {.prompt = "Scroll down once",
+                             .strage = &bowingKeyCfg.downBow}};
+
+int lengthPromptBase2 = 6;
+
+void promptingN(promptItem *promptBase1, int &index, int &lastIndex, OuterStates nextState, HardwareSerial *Serial2, String hexString, int lengthPromptBase)
+{
+  if (hexString != "" && hexString != "00")
+  {
+    *promptBase1[index].strage = hexString;
+    index++;
+    USBSerial.println("(promptingN)");
+    USBSerial.println(index);
+
+    if (index != lastIndex && index < lengthPromptBase)
+    {
+      M5.Lcd.setCursor(0, 0);
+      M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.println(promptBase1[index].prompt);
+      USBSerial.println(promptBase1[index].prompt);
+      lastIndex = index;
+    }
+
+    if (index == lengthPromptBase)
+    {
+      USBSerial.println("(promptingN)nextState");
+      outerState = nextState;
+    }
+  }
+}
 
 int instrument = 41;
 
@@ -396,13 +480,20 @@ void setup()
   M5.Lcd.setTextSize(2);
   M5.Lcd.setTextColor(YELLOW);
   M5.Lcd.println("Hello!");
-  // M5.Lcd.printf("Restart= %" PRIu32 "\n", restart_counter);
 
-  // outerState = ASK_CTR_KEY_CFG;
-  // CtrKeyCfg ctrKeyCfg = readCtrKeyCfg();
   ctrKeyCfg = readCtrKeyCfg();
   // cfg_ = askCtrKeyCfg();
-  outerState = ASK_CTR_KEY_CFG;
+  outerState = INIT;
+
+  USBSerial.println("3");
+  delay(1000);
+  USBSerial.println("2");
+  delay(1000);
+  USBSerial.println("1");
+  delay(1000);
+  USBSerial.println("0");
+  M5.Lcd.fillScreen(BLACK);
+  USBSerial.println("Hello!");
 }
 
 // CtrKeyCfg ctrKeyCfg;
@@ -415,237 +506,255 @@ int num = 0;
 
 void loop()
 {
-  // if (timeKeep % 1000 == 0)
-  // {
-  //   USBSerial.println(timeKeep);
-  // }
-
-  OuterStates outerState = ASK_CTR_KEY_CFG;
   String hexString = "";
-  if (outerState == ASK_CTR_KEY_CFG)
+  if (Serial2.available())
   {
-    timeKeep = millis();
-    String receivedData = "";
-    // UARTでデータを受信
-    if (Serial2.available())
-    {
-      receivedData = Serial2.readStringUntil('\n');
-    }
-
+    String receivedData = Serial2.readStringUntil('\n');
     for (int i = 0; i < receivedData.length(); i++)
     {
       char hex[3];
       sprintf(hex, "%02X", receivedData[i]);
       hexString += hex;
     }
+  }
+  if (hexString != "" && hexString != "00")
+  {
+    USBSerial.println("HexString: " + hexString);
+  }
 
+  if (outerState == INIT)
+  {
+
+#ifdef USB_SERIAL
+    USBSerial.println("INIT");
+    USBSerial.println("Please press and hold [Enter]\nTo skip: set [Esc]");
+#endif
+
+    M5.Lcd.setCursor(0, 0);
+    M5.Lcd.fillScreen(BLACK);
+    M5.Lcd.setTextSize(2);
+    M5.Lcd.startWrite();
+    M5.Lcd.println("Please press and hold [Enter]\nTo skip: set [Esc]");
+    M5.Lcd.endWrite();
+
+    outerState = START_CTR_KEY_CFG;
+  }
+  else if (outerState == START_CTR_KEY_CFG)
+  {
+    if (hexString != "" && hexString != "00")
+    {
+      USBSerial.println("START_CTR_KEY_CFG");
+      if (compare(hexString, ctrKeyCfg.esc))
+      {
+        outerState = MAIN;
+      }
+      else
+      {
+        ctrKeyCfg.enter = hexString;
+        outerState = ASK_CTR_KEY_CFG;
+      }
+    }
+
+    if (outerState == ASK_CTR_KEY_CFG)
+    {
+      M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.setCursor(0, 0);
+      M5.Lcd.println("Release [Enter]");
+      USBSerial.println("-->ASK_CTR_KEY_CFG");
+    }
+  }
+  else if (outerState == ASK_CTR_KEY_CFG)
+  {
+    promptingN(promptBase1, promptBase1_index, promptBase1_lastIndex, CONFIRM_CTR_KEY_CFG, &Serial2, hexString, lengthPromptBase1);
+
+    if (outerState == CONFIRM_CTR_KEY_CFG)
+    {
+      M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.setCursor(0, 0);
+      M5.Lcd.println("Push 4 keys to confirm.\nOK:BtnA\nRetry:BtnB");
+
+#ifdef USB_SERIAL
+      USBSerial.println("Push 4 keys to confirm. OK:BtnA Retry:BtnB");
+#endif
+    }
+
+#ifdef USB_SERIAL
     // USBSerial.print("Received Data: ");
     // USBSerial.println(hexString);
-
-    static int lastPhase = -1; // 前回のフェーズを記録する変数
-
-    if (ctrKeyPhase != lastPhase) // フェーズが変わったときだけ画面を更新
+#endif
+  }
+  else if (outerState == CONFIRM_CTR_KEY_CFG)
+  {
+    // USBSerial.println("CONFIRM_CTR_KEY_CFG");
+    M5.update();
+    if (hexString != "" && hexString != "00")
     {
-      M5.Lcd.startWrite();
       M5.Lcd.setCursor(0, 0);
       M5.Lcd.fillScreen(BLACK);
-      switch (ctrKeyPhase)
+      M5.Lcd.setTextColor(WHITE);
+      M5.Lcd.println("Push 4 keys to confirm.\nOK:BtnA\nRetry:BtnB");
+      M5.Lcd.setTextColor(YELLOW);
+
+      if (compare(hexString, ctrKeyCfg.enter))
       {
-      case 0:
-        M5.Lcd.println("Please press and hold [Enter]\nTo skip: set [Esc]");
-        break;
-      case 1:
-        M5.Lcd.println("Release [Enter]");
-        break;
-      case 2:
-        M5.Lcd.println("Please press and hold [Up]");
-        break;
-      case 3:
-        M5.Lcd.println("Release [Up]");
-        break;
-      case 4:
-        M5.Lcd.println("Please press and hold [Down]");
-        break;
-      case 5:
-        M5.Lcd.println("Release [Down]");
-        break;
-      case 6:
-        M5.Lcd.println("Please press and hold [Esc]");
-        break;
-      case 7:
-        M5.Lcd.println("Release [Esc]");
-        break;
-      case 8:
-        M5.Lcd.println("Check cfg\nRetry: BtnB\nOK: BtnA");
-        break;
-      case 9:
-        String msg = hexString;
-        M5.Lcd.println(msg);
+        M5.Lcd.println("[Enter]");
       }
-      M5.Lcd.endWrite();
-      lastPhase = ctrKeyPhase; // フェーズを更新
+      else if (compare(hexString, ctrKeyCfg.up))
+      {
+        M5.Lcd.println("[Up]");
+      }
+      else if (compare(hexString, ctrKeyCfg.down))
+      {
+        M5.Lcd.println("[Down]");
+      }
+      else if (compare(hexString, ctrKeyCfg.esc))
+      {
+        M5.Lcd.println("[Esc]");
+      }
+      else if (compare(hexString, ctrKeyCfg.pull_enter) || compare(hexString, ctrKeyCfg.pull_up) || compare(hexString, ctrKeyCfg.pull_down) || compare(hexString, ctrKeyCfg.pull_esc))
+      {
+        M5.Lcd.println("---");
+      }
+      else
+      {
+        M5.Lcd.println("Unknown");
+      }
     }
 
-    if (receivedData != "")
+    if (M5.BtnA.wasPressed())
     {
-      USBSerial.print("Phase: ");
-      USBSerial.println(ctrKeyPhase);
-      switch (ctrKeyPhase)
+      M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.setCursor(0, 0);
+      M5.Lcd.println("Writing to NVS...");
+
+#ifdef USB_SERIAL
+      USBSerial.println("Writing to NVS...");
+#endif
+
+      writeNVS("ctrKeyCfg_enter", ctrKeyCfg.enter);
+      writeNVS("ctrKeyCfg_up", ctrKeyCfg.up);
+      writeNVS("ctrKeyCfg_down", ctrKeyCfg.down);
+      writeNVS("ctrKeyCfg_esc", ctrKeyCfg.esc);
+
+      writeNVS("p_enter", ctrKeyCfg.pull_enter);
+      writeNVS("p_up", ctrKeyCfg.pull_up);
+      writeNVS("p_down", ctrKeyCfg.pull_down);
+      writeNVS("p_esc", ctrKeyCfg.pull_esc);
+
+      M5.Lcd.println("Done!");
+
+#ifdef USB_SERIAL
+      USBSerial.println("Done!");
+#endif
+
+      ctrKeyCfg = readCtrKeyCfg();
+
+#ifdef USB_SERIAL
+      USBSerial.println("ctrKeyCfg:");
+      USBSerial.println(ctrKeyCfg.enter);
+      USBSerial.println(ctrKeyCfg.up);
+      USBSerial.println(ctrKeyCfg.down);
+      USBSerial.println(ctrKeyCfg.esc);
+      USBSerial.println(ctrKeyCfg.pull_enter);
+      USBSerial.println(ctrKeyCfg.pull_up);
+      USBSerial.println(ctrKeyCfg.pull_down);
+      USBSerial.println(ctrKeyCfg.pull_esc);
+#endif
+
+      outerState = MUS_CFG_START;
+
+      M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.setCursor(0, 0);
+      M5.Lcd.println("To start mouse config [Enter] To skip: [Esc] Be careful not to make signal");
+    }
+    else if (M5.BtnB.wasPressed())
+    {
+      ctrKeyPhase = 0;
+    }
+  }
+  else if (outerState == MUS_CFG_START)
+  {
+    if (hexString != "" && hexString != "00")
+    {
+      USBSerial.println("MUS_CFG_START");
+      if (compare(hexString, ctrKeyCfg.esc))
       {
-      case 0:
-      USBSerial.println("Received: ");
-        USBSerial.println(hexString);
-        
-        for (int i = 0; i < ctrKeyCfg.esc.length(); i++)
-        {
-          USBSerial.print(ctrKeyCfg.esc[i], HEX);
-          // USBSerial.print(" ");
-        }
-        USBSerial.println();
-        USBSerial.println("Phase 0 compairing...");
-        if (compare(hexString, ctrKeyCfg.esc))
-        { 
-          USBSerial.println("Esc-------------------");
-          ctrKeyPhase = 8;
-          break;
-        }
-        else
-        {
-          ctrKeyCfg.enter = hexString;
-          ctrKeyPhase++;
-          break;
-        }
-      case 1:
-        ctrKeyCfg.pull_enter = hexString;
-        ctrKeyPhase++;
-        break;
-      case 2:
-        ctrKeyCfg.up = hexString;
-        ctrKeyPhase++;
-        break;
-      case 3:
-        ctrKeyCfg.pull_up = hexString;
-        ctrKeyPhase++;
-        break;
-      case 4:
-        ctrKeyCfg.down = hexString;
-        ctrKeyPhase++;
-        break;
-      case 5:
-        ctrKeyCfg.pull_down = hexString;
-        ctrKeyPhase++;
-        break;
-      case 6:
-        ctrKeyCfg.esc = hexString;
-        ctrKeyPhase++;
-        break;
-      case 7:
-        ctrKeyCfg.pull_esc = hexString;
-        USBSerial.println("Check cfg");
-        ctrKeyPhase++;
-        break;
-      case 8:
-        M5.Lcd.setCursor(0, 0);
+        outerState = MAIN;
+      }
+      else if (compare(hexString, ctrKeyCfg.enter))
+      {
+        outerState = MUS_CFG_BUF;
         M5.Lcd.fillScreen(BLACK);
-        for (int i = 0; i < hexString.length(); i++)
-        {
-          M5.Lcd.print(hexString[i], HEX);
-          M5.Lcd.print(" ");
-        }
-        M5.Lcd.println();
-        if (compare(hexString, ctrKeyCfg.enter))
-        {
-          USBSerial.println("Enter-----------------");
-        }
-        else if (compare(hexString, ctrKeyCfg.pull_enter))
-        {
-          USBSerial.println("Pull Enter------------");
-        }
-        else if (compare(hexString, ctrKeyCfg.up))
-        {
-          USBSerial.println("Up--------------------");
-        }
-        else if (compare(hexString, ctrKeyCfg.pull_up))
-        {
-          USBSerial.println("Pull Up---------------");
-        }
-        else if (compare(hexString, ctrKeyCfg.down))
-        {
-          USBSerial.println("Down------------------");
-        }
-        else if (compare(hexString, ctrKeyCfg.pull_down))
-        {
-          USBSerial.println("Pull Down-------------");
-        }
-        else if (compare(hexString, ctrKeyCfg.esc))
-        {
-          USBSerial.println("Esc-------------------");
-        }
-        else if (compare(hexString, ctrKeyCfg.pull_esc))
-        {
-          USBSerial.println("Pull Esc--------------");
-        }
-        else
-        {
-          USBSerial.println("Unknown");
-          USBSerial.println(hexString);
-          USBSerial.println(ctrKeyCfg.enter);
-          USBSerial.println(ctrKeyCfg.pull_enter);
-          USBSerial.println(ctrKeyCfg.up);
-          USBSerial.println(ctrKeyCfg.pull_up);
-          USBSerial.println(ctrKeyCfg.down);
-          USBSerial.println(ctrKeyCfg.pull_down);
-          USBSerial.println(ctrKeyCfg.esc);
-          USBSerial.println(ctrKeyCfg.pull_esc);
-        }
-        // USBSerial.print("Received  : ");
-        // printAsHEX(hexString);
-        // USBSerial.print("Enter     : ");
-        // printAsHEX(ctrKeyCfg.enter);
-        // USBSerial.print("Pull Enter: ");
-        // printAsHEX(ctrKeyCfg.pull_enter);
-        break;
+        M5.Lcd.setCursor(0, 0);
+        M5.Lcd.println("---");
       }
     }
-    if (ctrKeyPhase == 8)
+  }
+  else if (outerState == MUS_CFG_BUF)
+  {
+    if (hexString != "" && hexString != "00")
     {
-      USBSerial.println("ctrKeyPhase == 8");
-      M5.update();
-      if (M5.BtnA.wasPressed())
-      {
-        M5.Lcd.fillScreen(BLACK);
-        M5.Lcd.setCursor(0, 0);
-        M5.Lcd.println("Writing to NVS...");
-        USBSerial.println("Writing to NVS...");
-        writeNVS("ctrKeyCfg_enter", ctrKeyCfg.enter);
-        writeNVS("ctrKeyCfg_up", ctrKeyCfg.up);
-        writeNVS("ctrKeyCfg_down", ctrKeyCfg.down);
-        writeNVS("ctrKeyCfg_esc", ctrKeyCfg.esc);
+      USBSerial.println("MUS_CFG_BUF");
+      M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.setCursor(0, 0);
+      M5.Lcd.println("Push [R Click] and hold");
+      outerState = ASK_MUS_CFG;
+    }
+  }
+  else if (outerState == ASK_MUS_CFG)
+  {
+    promptingN(promptBase2, promptBase2_index, promptBase2_lastIndex, CONFIRM_MUS_CFG, &Serial2, hexString, lengthPromptBase2);
 
-        writeNVS("p_enter", ctrKeyCfg.pull_enter);
-        writeNVS("p_up", ctrKeyCfg.pull_up);
-        writeNVS("p_down", ctrKeyCfg.pull_down);
-        writeNVS("p_esc", ctrKeyCfg.pull_esc);
-        ctrKeyPhase = 0;
-        outerState = BOW;
-        M5.Lcd.println("Done!");
-        USBSerial.println("Done!");
+    if (outerState == CONFIRM_MUS_CFG)
+    {
+      M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.setCursor(0, 0);
+      M5.Lcd.println("Do 4 actions to confirm.\nOK:BtnA\nRetry:BtnB");
+    }
+  }
+  else if (outerState == CONFIRM_MUS_CFG)
+  {
+    M5.update();
+    if (hexString != "" && hexString != "00")
+    {
+      M5.Lcd.setCursor(0, 0);
+      M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.setTextColor(WHITE);
+      M5.Lcd.println("Do 4 actions to confirm.\nOK:BtnA\nRetry:BtnB");
+      M5.Lcd.setTextColor(YELLOW);
 
-        ctrKeyCfg = readCtrKeyCfg();
-        USBSerial.println("ctrKeyCfg:");
-        USBSerial.println(ctrKeyCfg.enter);
-        USBSerial.println(ctrKeyCfg.up);
-        USBSerial.println(ctrKeyCfg.down);
-        USBSerial.println(ctrKeyCfg.esc);
-        USBSerial.println(ctrKeyCfg.pull_enter);
-        USBSerial.println(ctrKeyCfg.pull_up);
-        USBSerial.println(ctrKeyCfg.pull_down);
-        USBSerial.println(ctrKeyCfg.pull_esc);
-      }
-      else if (M5.BtnB.wasPressed())
+      if (compare(hexString, bowingKeyCfg.rightClick))
       {
-        ctrKeyPhase = 0;
+        M5.Lcd.println("[R Click]");
       }
+      else if (compare(hexString, bowingKeyCfg.leftClick))
+      {
+        M5.Lcd.println("[L Click]");
+      }
+      else if (compare(hexString, bowingKeyCfg.upBow))
+      {
+        M5.Lcd.println("[Up Bow]");
+      }
+      else if (compare(hexString, bowingKeyCfg.downBow))
+      {
+        M5.Lcd.println("[Down Bow]");
+      }
+      else if (compare(hexString, bowingKeyCfg.pull_rightClick) || compare(hexString, bowingKeyCfg.pull_leftClick))
+      {
+        M5.Lcd.println("---");
+      }
+      else
+      {
+        M5.Lcd.println("Unknown");
+      }
+    }
+    if (M5.BtnA.wasPressed())
+    {
+      outerState = MAIN;
+    }
+    else if (M5.BtnB.wasPressed())
+    {
+      outerState = MAIN;
     }
   }
   else if (outerState == MAIN)
