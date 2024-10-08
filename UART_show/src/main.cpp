@@ -497,6 +497,7 @@ void setup()
   // delay(1000);
   USBSerial.println("0");
   M5.Lcd.fillScreen(BLACK);
+  M5.Lcd.setBrightness(90);
   USBSerial.println("Hello!");
 }
 
@@ -598,9 +599,9 @@ void loop()
     {
       M5.Lcd.setCursor(0, 0);
       M5.Lcd.fillScreen(BLACK);
-      M5.Lcd.setTextColor(WHITE);
+      M5.Lcd.setTextColor(YELLOW, BLACK);
       M5.Lcd.println("Push 4 keys to confirm.\nOK:BtnA\nRetry:BtnB");
-      M5.Lcd.setTextColor(YELLOW);
+      M5.Lcd.setTextColor(RED, WHITE);
 
       if (compare(hexString, ctrKeyCfg.enter))
       {
@@ -726,9 +727,9 @@ void loop()
     {
       M5.Lcd.setCursor(0, 0);
       M5.Lcd.fillScreen(BLACK);
-      M5.Lcd.setTextColor(WHITE);
+      M5.Lcd.setTextColor(YELLOW, BLACK);
       M5.Lcd.println("Do 4 actions to confirm.\nOK:BtnA\nRetry:BtnB");
-      M5.Lcd.setTextColor(YELLOW);
+      M5.Lcd.setTextColor(RED, WHITE);
 
       if (compare(hexString, bowingKeyCfg.rightClick))
       {
