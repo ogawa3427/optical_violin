@@ -9,8 +9,11 @@
 #include "nvs.h"
 // #include "Keyboard.h"
 
-#define USB_SERIAL true
+#define USB_SERIAL (0)
+#define SKIP_ALL_CFG (0)
 
+
+// Refs
 // https://github.com/espressif/esp-idf/blob/v5.3/examples/storage/nvs_rw_value/main/nvs_value_example_main.c
 
 void readNVS(const char *key, String &value)
@@ -23,7 +26,10 @@ void readNVS(const char *key, String &value)
   }
   else
   {
+
+#ifdef USB_SERIAL
     USBSerial.println("[READ]NVS handle opened successfully");
+#endif
 
     size_t required_size = 0; // valueのサイズを取得するための変数
     err = nvs_get_str(my_handle, key, NULL, &required_size);
@@ -34,7 +40,11 @@ void readNVS(const char *key, String &value)
       if (err == ESP_OK)
       {
         value = String(buffer);
+
+#ifdef USB_SERIAL
         USBSerial.printf("%s = %s\n", key, value.c_str());
+#endif
+
       }
       else
       {
@@ -54,12 +64,6 @@ void readNVS(const char *key, String &value)
   }
 }
 
-// void storeReceivedData(const String &receivedData, String &key)
-// {
-//   key = receivedData;
-//   USBSerial.printf("Stored data for key: %s\n", key.c_str());
-//   USBSerial.printf("Value: %s\n", receivedData.c_str());
-// }
 
 void writeNVS(const char *key, const String &value)
 {
@@ -74,20 +78,31 @@ void writeNVS(const char *key, const String &value)
     }
     else
     {
+
+#ifdef USB_SERIAL
       USBSerial.printf("[WRITE]Value updated successfully for key: %s\n", key);
+#endif
+
     }
 
     err = nvs_commit(my_handle);
+
+#ifdef USB_SERIAL
     USBSerial.println("[WRITE]Committing updates in NVS ...");
+#endif
+
     if (err != ESP_OK)
     {
       USBSerial.printf("[WRITE]Failed to commit updates for key: %s, error: %s\n", key, esp_err_to_name(err));
     }
     else
     {
-      USBSerial.printf("[WRITE]Updates committed successfully for key: %s\n", key);
-    }
 
+#ifdef USB_SERIAL
+      USBSerial.printf("[WRITE]Updates committed successfully for key: %s\n", key);
+#endif
+
+    }
     nvs_close(my_handle);
   }
   else
@@ -96,14 +111,19 @@ void writeNVS(const char *key, const String &value)
   }
 }
 
+
 void printAsHEX(const String &receivedData)
 {
+
+#ifdef USB_SERIAL
   for (int i = 0; i < receivedData.length(); i++)
   {
     USBSerial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
     USBSerial.print(" ");                  // 数字の間にスペースを入れる
   }
   USBSerial.println(); // 改行を出力
+#endif
+
 }
 
 bool compare(const String &receivedData, const String &rootString)
@@ -171,12 +191,16 @@ CtrKeyCfg readCtrKeyCfg()
   String temp;
   readNVS("ctrKeyCfg_enter", temp);
   cfg.enter = String(temp.c_str());
+
+#ifdef USB_SERIAL
   for (int i = 0; i < cfg.enter.length(); i++)
   {
     USBSerial.print(cfg.enter[i], HEX);
     USBSerial.print(" ");
     USBSerial.println();
   }
+#endif
+
   readNVS("ctrKeyCfg_up", temp);
   cfg.up = String(temp.c_str());
   readNVS("ctrKeyCfg_down", temp);
@@ -192,21 +216,19 @@ CtrKeyCfg readCtrKeyCfg()
   cfg.pull_down = String(temp.c_str());
   readNVS("p_esc", temp);
   cfg.pull_esc = String(temp.c_str());
+
+#ifdef
   for (int i = 0; i < cfg.pull_esc.length(); i++)
   {
     USBSerial.print(cfg.pull_esc[i], HEX);
     USBSerial.print(" ");
   }
   USBSerial.println();
+#endif
+
   return cfg;
 }
 
-      // writeNVS("bowCfg_rClick", bowingKeyCfg.rightClick);
-      // writeNVS("bowCfg_lClick", bowingKeyCfg.leftClick);
-      // writeNVS("bowCfg_upBow", bowingKeyCfg.upBow);
-      // writeNVS("bowCfg_downBow", bowingKeyCfg.downBow);
-      // writeNVS("bowCfg_p_rC", bowingKeyCfg.pull_rightClick);
-      // writeNVS("bowCfg_p_lC", bowingKeyCfg.pull_leftClick);
 
 BowingKeyCfg readBowingKeyCfg()
 {
@@ -383,21 +405,33 @@ void promptingN(promptItem *promptBase1, int &index, int &lastIndex, OuterStates
   {
     *promptBase1[index].strage = hexString;
     index++;
+
+#ifdef USB_SERIAL
     USBSerial.println("(promptingN)");
+    USBSerial.print("index:");
     USBSerial.println(index);
+#endif
 
     if (index != lastIndex && index < lengthPromptBase)
     {
       M5.Lcd.setCursor(0, 0);
       M5.Lcd.fillScreen(BLACK);
       M5.Lcd.println(promptBase1[index].prompt);
+
+#ifdef USB_SERIAL
+      USBSerial.print("prompt:");
       USBSerial.println(promptBase1[index].prompt);
+#endif
+
       lastIndex = index;
     }
 
     if (index == lengthPromptBase)
     {
+#ifdef USB_SERIAL
       USBSerial.println("(promptingN)nextState");
+#endif
+
       outerState = nextState;
     }
   }
@@ -520,7 +554,10 @@ void setup()
 {
   // UARTを初期化 (TX:GPIO1, RX:GPIO2を使用する例)
   Serial2.begin(115200, SERIAL_8N1, 5, 6);
+
+#ifdef USB_SERIAL
   USBSerial.begin(115200);
+#endif
 
   synth.begin(&Serial1, UNIT_SYNTH_BAUD, 1, 2);
   synth.setInstrument(0, 0, INSTRUMENT_);
@@ -557,24 +594,23 @@ void setup()
   }
 
   String value;
-  readNVS("key", value);
-  if (value == "")
-  {
-    writeNVS("key", "value");
-  }
+  // readNVS("key", value);
+  // if (value == "")
+  // {
+  //   writeNVS("key", "value");
+  // }
 
   auto cfg = M5.config();
   M5.begin(cfg);
-  M5.Display.startWrite();
-  M5.Display.setCursor(0, 0);
-  M5.Display.print(millis());
-  M5.Display.endWrite();
+  // M5.Display.startWrite();
+  // M5.Display.setCursor(0, 0);
+  // M5.Display.print(millis());
+  // M5.Display.endWrite();
   M5.Lcd.setTextSize(2);
   M5.Lcd.setTextColor(YELLOW);
   M5.Lcd.println("Hello!");
 
   ctrKeyCfg = readCtrKeyCfg();
-  // cfg_ = askCtrKeyCfg();
   outerState = INIT;
 
   // USBSerial.println("3");
@@ -583,10 +619,10 @@ void setup()
   // delay(1000);
   // USBSerial.println("1");
   // delay(1000);
-  USBSerial.println("0");
+  // USBSerial.println("0");
   M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setBrightness(90);
-  USBSerial.println("Hello!");
+  // USBSerial.println("Hello!");
 }
 
 // CtrKeyCfg ctrKeyCfg;
@@ -599,7 +635,9 @@ int num = 0;
 
 void loop()
 {
-  // outerState = MAIN;
+#ifdef SKIP_ALL_CFG
+  outerState = MAIN;
+#endif
 
   String receivedData = "";
   String hexString = "";
@@ -613,16 +651,6 @@ void loop()
       hexString += hex;
     }
   }
-  // if (hexString != "" && hexString != "00")
-  // {
-  //   for (int i = 0; i < hexString.length() / 2; i++)
-  //   {
-  //     USBSerial.print(hexString[i * 2]);
-  //     USBSerial.print(hexString[i * 2 + 1]);
-  //     USBSerial.print(" ");
-  //   }
-  //   USBSerial.println();
-  // }
 
   if (outerState == INIT)
   {
@@ -645,11 +673,14 @@ void loop()
   {
     if (hexString != "" && hexString != "00")
     {
+
+#ifdef USB_SERIAL
       USBSerial.println("START_CTR_KEY_CFG");
+#endif
+
       if (compare(hexString, ctrKeyCfg.esc))
       {
         outerState = MUS_CFG_START;
-        // outerState = MAIN;
 
         M5.Lcd.fillScreen(BLACK);
         M5.Lcd.setCursor(0, 0);
@@ -683,16 +714,16 @@ void loop()
 #ifdef USB_SERIAL
       USBSerial.println("Push 4 keys to confirm. OK:BtnA Retry:BtnB");
 #endif
-    }
 
-#ifdef USB_SERIAL
-    // USBSerial.print("Received Data: ");
-    // USBSerial.println(hexString);
-#endif
+    }
   }
   else if (outerState == CONFIRM_CTR_KEY_CFG)
   {
-    // USBSerial.println("CONFIRM_CTR_KEY_CFG");
+
+#ifdef USB_SERIAL
+    USBSerial.println("CONFIRM_CTR_KEY_CFG");
+#endif
+
     M5.update();
     if (hexString != "" && hexString != "00")
     {
@@ -783,7 +814,11 @@ void loop()
   {
     if (hexString != "" && hexString != "00")
     {
+
+#ifdef USB_SERIAL
       USBSerial.println("MUS_CFG_START");
+#endif
+
       if (compare(hexString, ctrKeyCfg.esc))
       {
         outerState = MAIN;
@@ -801,7 +836,11 @@ void loop()
   {
     if (hexString != "" && hexString != "00")
     {
+
+#ifdef USB_SERIAL
       USBSerial.println("MUS_CFG_BUF");
+#endif
+
       M5.Lcd.fillScreen(BLACK);
       M5.Lcd.setCursor(0, 0);
       M5.Lcd.println("Push [R Click] and hold");
@@ -884,18 +923,17 @@ void loop()
     }
   }
   // else if (outerState == MAIN)
-  else if (false)
-  {
-    if (hexString != "" && hexString != "00")
-    {
-      detection(hexString, receivedData);
-      M5.Lcd.setCursor(0, 0);
-      M5.Lcd.fillScreen(BLACK);
-      M5.Lcd.println("Detection");
-    }
-    delay(1);
-  }
   // else if (false)
+  // {
+  //   if (hexString != "" && hexString != "00")
+  //   {
+  //     detection(hexString, receivedData);
+  //     M5.Lcd.setCursor(0, 0);
+  //     M5.Lcd.fillScreen(BLACK);
+  //     M5.Lcd.println("Detection");
+  //   }
+  //   delay(1);
+  // }
   else if (outerState == MAIN)
   {
     timeKeep = millis();
@@ -903,20 +941,10 @@ void loop()
     // {
     //   USBSerial.println(timeKeep);
     // }
-    // UARTでデータを受信
-    // if (Serial2.available())
+
     if (hexString != "" && hexString != "00")
     {
-      // String receivedData = Serial2.readStringUntil('\n');
-      // for (int i = 0; i < receivedData.length(); i++)
-      // {
-      //   USBSerial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
-      //   USBSerial.print(" ");                  // 数字の間にスペースを入れる
-      // }
-      // USBSerial.println(); // 改行を出力
-      // 受信したデータの15バイト目と19バイト目を表示
-      // USBSerial.println("Received Data:");
-      if (true) //(receivedData.length() >= 19)
+      if (true)
       {
         char byte5 = receivedData[4];
         char byte15 = receivedData[13]; // 15バイト目 (インデックスは0から始まるので14)
@@ -1147,7 +1175,6 @@ void loop()
 
     // 変化があった場合のみ出力
     if (hasChanged)
-    // if (false)
     {
       USBSerial.print(num++);
       USBSerial.print(" ");
@@ -1185,159 +1212,3 @@ void loop()
     // delay(1);
   }
 }
-
-// #include "M5Unified.h"
-
-// uint8_t  uartRxBuff[1024];
-// int  rxPos = 0;
-// int  cmdLength = 0;
-// uint8_t  cmdType = 0;
-// long lastRxReceive = 0;
-
-// String deviceType[] = {"UNKNOWN", "POINTER", "MOUSE", "RESERVED", "JOYSTICK", "GAMEPAD", "KEYBOARD", "KEYPAD", "MULTI_AXIS", "SYSTEM"};
-// String keyboardstring;
-
-// #define MSG_TYPE_CONNECTED      0x01
-// #define MSG_TYPE_DISCONNECTED   0x02
-// #define MSG_TYPE_ERROR          0x03
-// #define MSG_TYPE_DEVICE_POLL    0x04
-// #define MSG_TYPE_DEVICE_STRING  0x05
-// #define MSG_TYPE_DEVICE_INFO    0x06
-// #define MSG_TYPE_HID_INFO       0x07
-// #define MSG_TYPE_STARTUP        0x08
-
-// void filterCommand(int buffLength, unsigned char *msgbuffer) {
-//   int cmdLength = buffLength;
-//   unsigned char msgType = msgbuffer[3];
-//   unsigned char devType = msgbuffer[4];
-//   unsigned char device = msgbuffer[5];
-//   unsigned char endpoint = msgbuffer[6];
-//   unsigned char idVendorL = msgbuffer[7];
-//   unsigned char idVendorH = msgbuffer[8];
-//   unsigned char idProductL = msgbuffer[9];
-//   unsigned char idProductH = msgbuffer[10];
-//   switch (msgType) {
-//     case MSG_TYPE_CONNECTED:
-//       USBSerial.print("Device Connected on port");
-//       USBSerial.println(device);
-//       break;
-//     case MSG_TYPE_DISCONNECTED:
-//       USBSerial.print("Device Disconnected on port");
-//       USBSerial.println(device);
-//       break;
-//     case MSG_TYPE_ERROR:
-//       USBSerial.print("Device Error ");
-//       USBSerial.print(device);
-//       USBSerial.print(" on port ");
-//       USBSerial.println(devType);
-//       break;
-//     case MSG_TYPE_DEVICE_POLL:
-//       USBSerial.print("Device HID Data from port: ");
-//       USBSerial.print(device);
-//       USBSerial.print(" , Length: ");
-//       USBSerial.print(cmdLength);
-//       USBSerial.print(" , Type: ");
-//       USBSerial.print (deviceType[devType]);
-//       USBSerial.print(" , ID: ");
-//       for (int j = 0; j < 4; j++) {
-//         USBSerial.print("0x");
-//         USBSerial.print(msgbuffer[j + 7], HEX);
-//         USBSerial.print(" ");
-//       }
-//       USBSerial.print(" ,  ");
-//       for (int j = 0; j < cmdLength; j++) {
-//         USBSerial.print("0x");
-//         USBSerial.print(msgbuffer[j + 11], HEX);
-//         USBSerial.print(" ");
-//       }
-//       USBSerial.println();
-//       break;
-//     case MSG_TYPE_DEVICE_STRING:
-//       USBSerial.print("Device String port ");
-//       USBSerial.print(devType);
-//       USBSerial.print(" Name: ");
-//       for (int j = 0; j < cmdLength; j++)
-//         USBSerial.write(msgbuffer[j + 11]);
-//       USBSerial.println();
-//       break;
-//     case MSG_TYPE_DEVICE_INFO:
-//       USBSerial.print("Device info from port");
-//       USBSerial.print(device);
-//       USBSerial.print(", Descriptor: ");
-//       for (int j = 0; j < cmdLength; j++) {
-//         USBSerial.print("0x");
-//         USBSerial.print(msgbuffer[j + 11], HEX);
-//         USBSerial.print(" ");
-//       }
-//       USBSerial.println();
-//       break;
-//     case MSG_TYPE_HID_INFO:
-//       USBSerial.print("HID info from port");
-//       USBSerial.print(device);
-//       USBSerial.print(", Descriptor: ");
-//       for (int j = 0; j < cmdLength; j++) {
-//         USBSerial.print("0x");
-//         USBSerial.print(msgbuffer[j + 11], HEX);
-//         USBSerial.print(" ");
-//       }
-//       USBSerial.println();
-//       break;
-//     case MSG_TYPE_STARTUP:
-//       USBSerial.println("USB host ready");
-//       break;
-//   }
-// }
-
-// void setup(void) {
-//   auto cfg = M5.config();
-//   // Serial1.begin(1000000, SERIAL_8N1, 36, 26);
-//   // delay(1000);
-//   // Serial.println("OK There");
-//   M5.begin(cfg);
-//   Serial2.begin(115200, SERIAL_8N1, 5, 6);
-//   USBSerial.begin(115200);
-//   delay(1000);
-//   USBSerial.println("OK There");
-// }
-
-// void loop() {
-//   while (Serial2.available()) {
-//     lastRxReceive = millis();
-//     //Serial.print("h0x");//Only for Debug
-//     //Serial.print(Serial1.peek(),HEX);//Only for Debug
-//     //Serial.print(" ");//Only for Debug
-//     uartRxBuff[rxPos] = Serial2.read();
-//     if (rxPos == 0 && uartRxBuff[rxPos] == 0xFE) {
-//       cmdType = 1;
-//     } else if (rxPos == 1 && cmdType == 1) {
-//       cmdLength = uartRxBuff[rxPos];
-//     } else if (rxPos == 2 && cmdType == 1) {
-//       cmdLength += (uartRxBuff[rxPos] << 8);
-//       //printf( "Length: %i\n", cmdLength);//Only for Debug
-//     } else if (cmdType == 0 && uartRxBuff[rxPos] == '\n') {
-//       USBSerial.printf("No COMMAND Received\n");
-//       for (uint8_t i = 0; i < rxPos; i ++ ) {
-//         USBSerial.printf( "0x%02X ", uartRxBuff[i]);
-//       }
-//       USBSerial.println();
-//       rxPos = 0;
-//       cmdType = 0;
-//     }
-//     if ((rxPos > 0 && rxPos == cmdLength + 11 && cmdType) || rxPos > 1024) {
-//       filterCommand(cmdLength, uartRxBuff);
-//       for (int i = 0; i < rxPos; i ++ ) {
-//         //USBSerial.printf( "0x%02X ", uartRxBuff[i]);//Only for Debug
-//       }
-//       //USBSerial.println();//Only for Debug
-//       rxPos = 0;
-//       cmdType = 0;
-//     } else {
-//       rxPos++;
-//     }
-//   }
-//   rxPos = 0;
-
-//   if (USBSerial.available()) {
-//     Serial2.write(USBSerial.read());
-//   }
-// }
