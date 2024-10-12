@@ -7,11 +7,10 @@
 #include <freertos/task.h>
 #include "nvs_flash.h"
 #include "nvs.h"
-// #include "Keyboard.h"
+#include "keys.h"
 
-#define USB_SERIAL (0)
-#define SKIP_ALL_CFG (0)
-
+// #define USB_SERIAL (1)
+#define SKIP_ALL_CFG (1)
 
 // Refs
 // https://github.com/espressif/esp-idf/blob/v5.3/examples/storage/nvs_rw_value/main/nvs_value_example_main.c
@@ -217,7 +216,7 @@ CtrKeyCfg readCtrKeyCfg()
   readNVS("p_esc", temp);
   cfg.pull_esc = String(temp.c_str());
 
-#ifdef
+#ifdef USB_SERIAL
   for (int i = 0; i < cfg.pull_esc.length(); i++)
   {
     USBSerial.print(cfg.pull_esc[i], HEX);
@@ -474,16 +473,19 @@ bool down_bow = false;
 bool right_click = false;
 bool left_click = false;
 
-std::vector<uint16_t> keyboard_data;
 std::vector<uint16_t> last_keyboard_data;
 
 std::vector<uint16_t> additional;
 std::vector<uint16_t> deletional;
 
-std::vector<uint16_t> keys_queue;
+std::vector<uint16_t> keys_stack;
+uint16_t keys_stack_Top = 0x00;
+uint16_t last_keys_stack_Top = 0x00;
 
 void detection(String hexString, String receivedData)
 {
+  std::vector<uint16_t> keyboard_data;
+
   up_bow = false;
   down_bow = false;
 
@@ -510,41 +512,126 @@ void detection(String hexString, String receivedData)
 
   if (devType == 0x06)
   {
-
-    // data.erase(data.begin(), data.begin() + 2);
-    // for (int i = 0; i < 4; i++)
-    // {
-    //   if (data[i] != 0x00 && std::find(last_keyboard_data.begin(), last_keyboard_data.end(), data[i]) == last_keyboard_data.end())
-    //   {
-    //     additional.push_back(data[i]);
-    //     USBSerial.printf("%02X ", data[i]);
-    //   }
-    //   if (data[i] != 0x00 && std::find(last_keyboard_data.begin(), last_keyboard_data.end(), data[i]) != last_keyboard_data.end())
-    //   {
-    //     deletional.push_back(data[i]);
-    //     USBSerial.printf("%02X ", data[i]);
-    //   }
-    // }
-
-    for (int i = 0; i < deletional.size(); i++)
+    // Mod Keys
+    if (modKeysByte & 0b00000001)
     {
-      keys_queue.erase(std::remove(keys_queue.begin(), keys_queue.end(), deletional[i]), keys_queue.end());
-      USBSerial.printf("%02X ", deletional[i]);
+      keyboard_data.push_back(KEYBOARD_LEFT_CTRL);
+    }
+    if (modKeysByte & 0b00000010)
+    {
+      keyboard_data.push_back(KEYBOARD_LEFT_SHIFT);
+    }
+    if (modKeysByte & 0b00000100)
+    {
+      keyboard_data.push_back(KEYBOARD_LEFT_ALT);
+    }
+    if (modKeysByte & 0b00001000)
+    {
+      keyboard_data.push_back(KEYBOARD_LEFT_GUI);
+    }
+    if (modKeysByte & 0b00010000)
+    {
+      keyboard_data.push_back(KEYBOARD_RIGHT_CTRL);
+    }
+    if (modKeysByte & 0b00100000)
+    {
+      keyboard_data.push_back(KEYBOARD_RIGHT_SHIFT);
+    }
+    if (modKeysByte & 0b01000000)
+    {
+      keyboard_data.push_back(KEYBOARD_RIGHT_ALT);
+    }
+    if (modKeysByte & 0b10000000)
+    {
+      keyboard_data.push_back(KEYBOARD_RIGHT_GUI);
     }
 
-    for (int i = 0; i < additional.size(); i++)
+    for (int i = 0; i < 6; i++)
     {
-      keys_queue.insert(keys_queue.begin(), additional[i]);
-      USBSerial.printf("%02X ", additional[i]);
+      if (ordinalKeysByte[i] != 0x00)
+      {
+        keyboard_data.push_back(ordinalKeysByte[i]);
+      }
     }
 
-    for (int i = 0; i < keys_queue.size(); i++)
+    for (int i = 0; i < last_keyboard_data.size(); i++)
     {
-      USBSerial.printf("%02X ", keys_queue[i]);
+      if (std::find(keyboard_data.begin(), keyboard_data.end(), last_keyboard_data[i]) == keyboard_data.end())
+      {
+        deletional.push_back(last_keyboard_data[i]);
+      }
+    }
+
+    for (int i = 0; i < keyboard_data.size(); i++)
+    {
+      if (std::find(last_keyboard_data.begin(), last_keyboard_data.end(), keyboard_data[i]) == last_keyboard_data.end())
+      {
+        additional.push_back(keyboard_data[i]);
+      }
+    }
+
+    for (int i = 0; i < keyboard_data.size(); i++)
+    {
+      USBSerial.printf("%02X ", keyboard_data[i]);
+      USBSerial.print(" ");
+      USBSerial.print(keyNameDict[keyboard_data[i]]);
+      USBSerial.print(" ");
     }
     USBSerial.println();
 
-    // last_keyboard_data = data;
+    USBSerial.print("additional: ");
+    for (int i = 0; i < additional.size(); i++)
+    {
+      USBSerial.printf("%02X ", additional[i]);
+    }
+    USBSerial.println();
+
+    USBSerial.print("deletional: ");
+    for (int i = 0; i < deletional.size(); i++)
+    {
+      USBSerial.printf("%02X ", deletional[i]);
+    }
+    USBSerial.println();
+
+    for (int i = 0; i < additional.size(); i++)
+    {
+      keys_stack.insert(keys_stack.begin(), additional[i]);
+    }
+
+    for (int i = 0; i < deletional.size(); i++)
+    {
+      keys_stack.erase(std::remove(keys_stack.begin(), keys_stack.end(), deletional[i]), keys_stack.end());
+    }
+
+    for (int i = 0; i < keys_stack.size(); i++)
+    {
+      USBSerial.printf("%02X ", keys_stack[i]);
+      USBSerial.print(" ");
+      USBSerial.println(keyNameDict[keys_stack[i]]);
+    }
+    USBSerial.println();
+
+    if (keys_stack.empty())
+    {
+      keys_stack_Top = 0x00;
+    }
+    else
+    {
+      keys_stack_Top = keys_stack[0];
+    }
+
+    if (keys_stack_Top != last_keys_stack_Top)
+    {
+      M5.Lcd.setCursor(0, 0);
+      M5.Lcd.fillScreen(BLACK);
+      if (keys_stack_Top != 0x00)
+      {
+        M5.Lcd.println(keyNameDict[keys_stack_Top]);
+      }
+    }
+
+    last_keyboard_data = keyboard_data;
+    last_keys_stack_Top = keys_stack_Top;
     additional.clear();
     deletional.clear();
   }
@@ -555,9 +642,9 @@ void setup()
   // UARTを初期化 (TX:GPIO1, RX:GPIO2を使用する例)
   Serial2.begin(115200, SERIAL_8N1, 5, 6);
 
-#ifdef USB_SERIAL
+// #ifdef USB_SERIAL
   USBSerial.begin(115200);
-#endif
+// #endif
 
   synth.begin(&Serial1, UNIT_SYNTH_BAUD, 1, 2);
   synth.setInstrument(0, 0, INSTRUMENT_);
@@ -935,6 +1022,10 @@ void loop()
   //   delay(1);
   // }
   else if (outerState == MAIN)
+  {
+    detection(hexString, receivedData);
+  }
+  else if (false)
   {
     timeKeep = millis();
     // if (timeKeep % 1000 == 0)
