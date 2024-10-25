@@ -10,7 +10,7 @@
 #include "keys.h"
 
 // #define USB_SERIAL (1)
-#define SKIP_ALL_CFG (1)
+// #define SKIP_ALL_CFG (1)
 
 // Refs
 // https://github.com/espressif/esp-idf/blob/v5.3/examples/storage/nvs_rw_value/main/nvs_value_example_main.c
@@ -648,8 +648,8 @@ void setup()
 
   synth.begin(&Serial1, UNIT_SYNTH_BAUD, 1, 2);
   synth.setInstrument(0, 0, INSTRUMENT_);
-  synth.setNoteOn(0, NOTE_C6, VOLUME);
-  delay(1000);
+  // synth.setNoteOn(0, NOTE_C6, VOLUME);
+  // delay(1000);
   synth.setNoteOff(0, NOTE_C6, 0);
 
   // Initialize NVS
@@ -698,6 +698,7 @@ void setup()
   M5.Lcd.println("Hello!");
 
   ctrKeyCfg = readCtrKeyCfg();
+  bowingKeyCfg = readBowingKeyCfg();
   outerState = INIT;
 
   // USBSerial.println("3");
@@ -737,6 +738,8 @@ void loop()
       sprintf(hex, "%02X", receivedData[i]);
       hexString += hex;
     }
+    USBSerial.print("hexString: ");
+    USBSerial.println(hexString);
   }
 
   if (outerState == INIT)
@@ -889,6 +892,8 @@ void loop()
       outerState = MUS_CFG_START;
 
       M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.setBrightness(90);
+      M5.Lcd.setTextColor(YELLOW, BLACK);
       M5.Lcd.setCursor(0, 0);
       M5.Lcd.println("To start mouse config [Enter] To skip: [Esc] Be careful not to make signal");
     }
@@ -909,6 +914,9 @@ void loop()
       if (compare(hexString, ctrKeyCfg.esc))
       {
         outerState = MAIN;
+        M5.Lcd.fillScreen(BLACK);
+        M5.Lcd.setCursor(0, 0);
+        M5.Lcd.println("Main mode");
       }
       else if (compare(hexString, ctrKeyCfg.enter))
       {
@@ -1003,6 +1011,9 @@ void loop()
 #endif
 
       outerState = MAIN;
+      M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.setCursor(0, 0);
+      M5.Lcd.println("Main mode");
     }
     else if (M5.BtnB.wasPressed())
     {
@@ -1010,22 +1021,12 @@ void loop()
     }
   }
   // else if (outerState == MAIN)
-  // else if (false)
-  // {
-  //   if (hexString != "" && hexString != "00")
-  //   {
-  //     detection(hexString, receivedData);
-  //     M5.Lcd.setCursor(0, 0);
-  //     M5.Lcd.fillScreen(BLACK);
-  //     M5.Lcd.println("Detection");
-  //   }
-  //   delay(1);
-  // }
-  else if (outerState == MAIN)
+  else if (false)
   {
     detection(hexString, receivedData);
   }
-  else if (false)
+  // else if (false)
+  else if (outerState == MAIN)
   {
     timeKeep = millis();
     // if (timeKeep % 1000 == 0)
@@ -1035,8 +1036,18 @@ void loop()
 
     if (hexString != "" && hexString != "00")
     {
+      // USBSerial.print("hex: ");
+      // USBSerial.println(hexString);
+      // USBSerial.print("ubo: ");
+      // USBSerial.println(bowingKeyCfg.upBow);
+      // USBSerial.print("dbo: ");
+      // USBSerial.println(bowingKeyCfg.downBow);
       if (true)
       {
+        M5.Lcd.setCursor(0, 0);
+        M5.Lcd.fillScreen(BLACK);
+        M5.Lcd.setTextColor(YELLOW, BLACK);
+        M5.Lcd.println("Main mode");
         char byte5 = receivedData[4];
         char byte15 = receivedData[13]; // 15バイト目 (インデックスは0から始まるので14)
         char byte16 = receivedData[14];
@@ -1078,16 +1089,16 @@ void loop()
         // }
         // ここに新しい条件を追加
         // if (byte5 == 0x00 && byte15 == 0x00 && byte16 == 0xFF && byte17 == 0x00)
-        if (hexString == bowingKeyCfg.upBow)
+        if (compare(hexString, bowingKeyCfg.upBow))
         // else if (byte5 == 0x00 && byte15 == 0x00 && byte16 == 0xFF && byte17 == 0x00)
         {
-          USBSerial.print("UpScr");
+          // USBSerial.print("UpScr");
           pastTime = timeKeep;
         }
         // else if (byte5 == 0x00 && byte15 == 0x00 && byte16 == 0x01 && byte17 == 0x00)
-        if (hexString == bowingKeyCfg.downBow)
+        if (compare(hexString, bowingKeyCfg.downBow))
         {
-          USBSerial.print("DownScr");
+          // USBSerial.print("DownScr");
           pastTime = timeKeep;
         }
         else if (byte5 == 0x06)
@@ -1165,6 +1176,7 @@ void loop()
         // USBSerial.print(" pastHold:");
         // USBSerial.print(pastHold);
         // USBSerial.println();
+        M5.Lcd.println(currentNote);
       }
     }
     isNotPassed = timeKeep - pastTime < SUS_BORDER;
@@ -1265,7 +1277,8 @@ void loop()
                       (state != pastState);
 
     // 変化があった場合のみ出力
-    if (hasChanged)
+    // if (hasChanged)
+    if (false)
     {
       USBSerial.print(num++);
       USBSerial.print(" ");
@@ -1303,3 +1316,4 @@ void loop()
     // delay(1);
   }
 }
+
