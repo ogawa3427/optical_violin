@@ -9,6 +9,9 @@
 #include "nvs.h"
 #include "keys.h"
 
+#define SLAP_BASS_1 37
+#define SLAP_BASS_2 38
+
 // #define USB_SERIAL (1)
 // #define SKIP_ALL_CFG (1)
 
@@ -721,6 +724,9 @@ int pastCurrentNote = 0;
 bool pastGoSign = false;
 int num = 0;
 
+int past_sum_time = 0;
+int past_pull_time = 0;
+
 void loop()
 {
 #ifdef SKIP_ALL_CFG
@@ -1029,6 +1035,14 @@ void loop()
   else if (outerState == MAIN)
   {
     timeKeep = millis();
+
+    if (timeKeep - past_sum_time > 120){
+      synth.setNoteOff(0, currentNote - 24, 0);
+    }
+    if (timeKeep - past_pull_time > 120)
+    {
+      synth.setNoteOff(0, currentNote - 24, 0);
+    }
     // if (timeKeep % 1000 == 0)
     // {
     //   USBSerial.println(timeKeep);
@@ -1065,7 +1079,7 @@ void loop()
         // 前回の受信から0.05秒以上経過しているか判定
         int delta = timeKeep - timeStamp_LastReceive;
         timeStamp_LastReceive = timeKeep;
-        if (delta > 25)
+        if (delta > 10)
         {
           // USBSerial.print("---------------------------------");
           // USBSerial.println(delta);
@@ -1177,6 +1191,28 @@ void loop()
         // USBSerial.print(pastHold);
         // USBSerial.println();
         M5.Lcd.println(currentNote);
+      }
+
+      if (compare(hexString, bowingKeyCfg.upBow) || compare(hexString, bowingKeyCfg.downBow))
+      {
+        // ホイールが動いた場合
+        if (millis() - past_sum_time < 120)
+        {
+          synth.setNoteOff(0, currentNote - 24, 0);
+        }
+        synth.setInstrument(0, 0, SLAP_BASS_1);
+        synth.setNoteOn(0, currentNote - 24, VOLUME);
+        past_sum_time = millis();
+      }
+      else if (compare(hexString, bowingKeyCfg.rightClick) || compare(hexString, bowingKeyCfg.leftClick))
+      {
+        // Rボタンが押された場合
+        if (millis() - past_pull_time < 120){
+          synth.setNoteOff(0, currentNote - 24, 0);
+        }
+        synth.setInstrument(0, 0, SLAP_BASS_2);
+        synth.setNoteOn(0, currentNote - 24, VOLUME);
+        past_pull_time = millis();
       }
     }
     isNotPassed = timeKeep - pastTime < SUS_BORDER;
