@@ -15,6 +15,64 @@
 // Refs
 // https://github.com/espressif/esp-idf/blob/v5.3/examples/storage/nvs_rw_value/main/nvs_value_example_main.c
 
+#define FINGER_BASS (34)
+#define BASS_PULL (37)
+#define BASS_SUM (38)
+
+int sumBorderTimer = 0;
+#define SUM_BORDER_TIME (100)
+#define SUM_BORDER_NUM (3)
+
+int susTimer = 0;
+#define FINGER_SUS_TIME (1500)
+#define SUM_SUS_TIME (400)
+
+#define PULL_BORDER_TIME (100)
+int pullBorderTimer = 0;
+
+#define PULL_SUS_TIME (1500)
+
+int pull_pitchbend_base_memory = 0;
+int pull_pitchbend_memory = 0;
+bool pull_pitchbend_range_set = false;
+
+int lastNote = 0;
+int lastLoopNote = 0;
+bool rightClick = false;
+bool leftClick = false;
+bool pastRightClick = false;
+bool pastLeftClick = false;
+
+bool sum = false;
+bool pull = false;
+bool releasedCK = false;
+
+bool linePressed = false;
+bool touchingLine = false;
+bool pastTouchingLine = false;
+
+enum bassStates
+{
+  NONE,
+  ON_FINGER,
+  // BLOCK_FINGER,
+  SUS_FINGER,
+  CHG_FINGER,
+  FIN_FINGER,
+  ON_PULL,
+  BLOCK_PULL,
+  SUS_PULL,
+  CHG_PULL,
+  CHG2_PULL,
+  FIN_PULL,
+  ON_SUM,
+  BLOCK_SUM,
+  SUS_SUM,
+  FIN_SUM
+};
+
+bassStates bassState = NONE;
+
 void readNVS(const char *key, String &value)
 {
   nvs_handle_t my_handle;
@@ -43,7 +101,6 @@ void readNVS(const char *key, String &value)
 #ifdef USB_SERIAL
         USBSerial.printf("%s = %s\n", key, value.c_str());
 #endif
-
       }
       else
       {
@@ -63,7 +120,6 @@ void readNVS(const char *key, String &value)
   }
 }
 
-
 void writeNVS(const char *key, const String &value)
 {
   nvs_handle_t my_handle;
@@ -81,7 +137,6 @@ void writeNVS(const char *key, const String &value)
 #ifdef USB_SERIAL
       USBSerial.printf("[WRITE]Value updated successfully for key: %s\n", key);
 #endif
-
     }
 
     err = nvs_commit(my_handle);
@@ -100,7 +155,6 @@ void writeNVS(const char *key, const String &value)
 #ifdef USB_SERIAL
       USBSerial.printf("[WRITE]Updates committed successfully for key: %s\n", key);
 #endif
-
     }
     nvs_close(my_handle);
   }
@@ -109,7 +163,6 @@ void writeNVS(const char *key, const String &value)
     USBSerial.printf("[WRITE]Error (%s) opening NVS handle!\n", esp_err_to_name(err));
   }
 }
-
 
 void printAsHEX(const String &receivedData)
 {
@@ -122,7 +175,6 @@ void printAsHEX(const String &receivedData)
   }
   USBSerial.println(); // 改行を出力
 #endif
-
 }
 
 bool compare(const String &receivedData, const String &rootString)
@@ -228,7 +280,6 @@ CtrKeyCfg readCtrKeyCfg()
   return cfg;
 }
 
-
 BowingKeyCfg readBowingKeyCfg()
 {
   BowingKeyCfg cfg;
@@ -293,6 +344,7 @@ enum OuterStates
   CONFIRM_TONE_CFG,
   READ_TONE_CFG,
   MAIN,
+  MAIN_BASS,
   BOW,
   TONE
 };
@@ -636,15 +688,16 @@ void detection(String hexString, String receivedData)
     deletional.clear();
   }
 }
+static int sustainTimeKeep = 0;
 
 void setup()
 {
   // UARTを初期化 (TX:GPIO1, RX:GPIO2を使用する例)
   Serial2.begin(115200, SERIAL_8N1, 5, 6);
 
-// #ifdef USB_SERIAL
+  // #ifdef USB_SERIAL
   USBSerial.begin(115200);
-// #endif
+  // #endif
 
   synth.begin(&Serial1, UNIT_SYNTH_BAUD, 1, 2);
   synth.setInstrument(0, 0, INSTRUMENT_);
@@ -804,7 +857,6 @@ void loop()
 #ifdef USB_SERIAL
       USBSerial.println("Push 4 keys to confirm. OK:BtnA Retry:BtnB");
 #endif
-
     }
   }
   else if (outerState == CONFIRM_CTR_KEY_CFG)
@@ -1315,5 +1367,355 @@ void loop()
     // pastBow = valBow;
     // delay(1);
   }
-}
+  else if (outerState == MAIN_BASS)
+  {
 
+    timeKeep = millis();
+    // if (timeKeep % 1000 == 0)
+    // {
+    //   USBSerial.println(timeKeep);
+    // }
+
+    if (hexString != "" && hexString != "00")
+    {
+      // USBSerial.print("hex: ");
+      // USBSerial.println(hexString);
+      // USBSerial.print("ubo: ");
+      // USBSerial.println(bowingKeyCfg.upBow);
+      // USBSerial.print("dbo: ");
+      // USBSerial.println(bowingKeyCfg.downBow);
+
+      M5.Lcd.setCursor(0, 0);
+      M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.setTextColor(YELLOW, BLACK);
+      M5.Lcd.setTextSize(3);
+      M5.Lcd.println("Bass");
+      char byte5 = receivedData[4];
+      char byte15 = receivedData[13]; // 15バイト目 (インデックスは0から始まるので14)
+      char byte16 = receivedData[14];
+      char byte17 = receivedData[15];
+      char byte18 = receivedData[16];
+      char byte19 = receivedData[17]; // 19バイト目 (インデックスは0から始まるので18)
+      // USBSerial.print(byte5, HEX);    // 15バイト目を16進数で出力
+      // USBSerial.print(" ");           // 数字の間にスペースを入れる
+      // USBSerial.print(byte15, HEX);   // 19バイト目を16進数で出力
+      // USBSerial.print(" ");           // 数字の間にスペースを入れる
+      // USBSerial.print(byte16, HEX);   // 5バイト目を16進数で出力
+      // USBSerial.print(" ");           // 数字の間にスペースを入れる
+      // USBSerial.print(byte17, HEX);   // 5バイト目を16進数で出力
+      // USBSerial.println();            // 改行を出力
+      // 前回の受信から0.05秒以上経過しているか判定
+      int delta = timeKeep - timeStamp_LastReceive;
+      timeStamp_LastReceive = timeKeep;
+      if (delta > 25)
+      {
+        // USBSerial.print("---------------------------------");
+        // USBSerial.println(delta);
+      }
+      for (int i = 0; i < receivedData.length(); i++)
+      {
+        // USBSerial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
+        // USBSerial.print(" ");                  // 数字の間にスペースを入れる
+      }
+      // USBSerial.println(); // 改行を出力
+      hold = true;
+      // if (byte17 == 0xFF && byte5 == 0x03)
+      // {
+      //   // USBSerial.print("UpScr");
+      //   pastTime = timeKeep;
+      // }
+      // else if (byte17 == 0x01 && byte5 == 0x03)
+      // {
+      //   // USBSerial.print("DownScr");
+      //   pastTime = timeKeep;
+      // }
+      // ここに新しい条件を追加
+      // if (byte5 == 0x00 && byte15 == 0x00 && byte16 == 0xFF && byte17 == 0x00)
+      if (compare(hexString, bowingKeyCfg.upBow))
+      {
+        // USBSerial.print("UpScr");
+        // pastTime = timeKeep;
+        pull = true;
+      }
+      // else if (byte5 == 0x00 && byte15 == 0x00 && byte16 == 0x01 && byte17 == 0x00)
+      else if (compare(hexString, bowingKeyCfg.downBow))
+      {
+        // USBSerial.print("DownScr");
+        // pastTime = timeKeep;
+        sum = true;
+      }
+      else if (compare(hexString, bowingKeyCfg.rightClick))
+      {
+        rightClick = true;
+        touchingLine = true;
+      }
+      else if (compare(hexString, bowingKeyCfg.leftClick))
+      {
+        leftClick = true;
+        touchingLine = true;
+      }
+      else if (compare(hexString, bowingKeyCfg.pull_rightClick) || compare(hexString, bowingKeyCfg.pull_leftClick))
+      {
+        releasedCK = true;
+        touchingLine = false;
+      }
+      else if (byte5 == 0x06)
+      {
+        M5.Lcd.setCursor(0, 0);
+        M5.Lcd.fillScreen(BLACK);
+        if (byte15 == 0x00 && byte16 == 0x00 && byte17 == 0x00 && byte18 == 0x00)
+        {
+          // USBSerial.print("OFF");
+          hold = false;
+          updateNote();
+          currentNote = 0;
+          M5.Lcd.println("OFF");
+        }
+        else if (byte15 != 0x00 && byte16 == 0x00 && byte17 == 0x00 && byte18 == 0x00)
+        {
+          // USBSerial.print(byte15, HEX);
+          updateNote();
+          currentNote = tonedict[byte15];
+          pastByte15 = byte15;
+          pastByte16 = byte16;
+          M5.Lcd.println("ON");
+          linePressed = true;
+        }
+        else if (byte15 == 0x00 && byte16 != 0x00 && byte17 == 0x00 && byte18 == 0x00)
+        {
+          // USBSerial.print(byte16, HEX);
+          updateNote();
+          currentNote = tonedict[byte16];
+          pastByte15 = byte15;
+          pastByte16 = byte16;
+          M5.Lcd.println("ON2");
+          linePressed = true;
+        }
+        else if (byte15 != 0x00 && byte16 != 0x00 && byte17 == 0x00 && byte18 == 0x00)
+        {
+          if (pastByte15 == 0x00 && pastByte16 != 0x00)
+          {
+            // USBSerial.print(byte15, HEX);
+            pastNote = currentNote;
+            currentNote = tonedict[byte15];
+            linePressed = true;
+          }
+          else
+          {
+            // USBSerial.print(byte16, HEX);
+            pastNote = currentNote;
+            currentNote = tonedict[byte16];
+            linePressed = true;
+          }
+          M5.Lcd.println("ON3");
+        }
+      }
+      else if (byte19 == 0x00 && byte15 != 0x00 && byte5 == 0x06 && byte17 == 0x00 && byte18 == 0x00)
+      {
+        // USBSerial.print(byte15, HEX);
+        currentNote = tonedict[byte15];
+        M5.Lcd.println("ON4");
+        linePressed = true;
+      }
+
+      M5.Lcd.println(currentNote);
+    }
+
+    isNotPassed = timeKeep - pastTime < SUS_BORDER;
+    goSign = isNotPassed && currentNote != 0;
+
+    switch (bassState)
+    {
+    case NONE:
+      if (sum)
+      {
+        // bassState = COUNT_SUM;
+        bassState = ON_SUM;
+      }
+      else if (pull)
+      {
+        bassState = ON_PULL;
+      }
+      else if (releasedCK && !touchingLine && pastTouchingLine)
+      {
+        bassState = ON_FINGER;
+      }
+      break;
+    case ON_FINGER:
+      synth.setNoteOff(0, pastNote, 0);
+      synth.setInstrument(0, 0, FINGER_BASS);
+      synth.setNoteOn(0, currentNote, VOLUME);
+      susTimer = timeKeep;
+      break;
+    case SUS_FINGER:
+      if (currentNote != lastLoopNote && linePressed)
+      {
+        bassState = CHG_FINGER;
+        break;
+      }
+      // timeCheck
+      if (timeKeep - susTimer > FINGER_SUS_TIME)
+      {
+        bassState = FIN_FINGER;
+        break;
+      }
+      break;
+    case CHG_FINGER:
+      synth.setNoteOff(0, pastNote, 0);
+      synth.setNoteOn(0, currentNote, VOLUME);
+      bassState = SUS_FINGER;
+      break;
+    case FIN_FINGER:
+      bassState = NONE;
+      synth.setNoteOff(0, currentNote, 0);
+      break;
+    case ON_SUM:
+      synth.setNoteOff(0, pastNote, 0);
+      synth.setInstrument(0, 0, BASS_SUM);
+      synth.setNoteOn(0, currentNote, VOLUME);
+      sumBorderTimer = timeKeep;
+      bassState = BLOCK_SUM;
+      break;
+    case BLOCK_SUM:
+      if (timeKeep - sumBorderTimer > SUM_BORDER_TIME)
+      {
+        bassState = SUS_SUM;
+        break;
+      }
+      break;
+    case SUS_SUM:
+      if (!linePressed || touchingLine)
+      {
+        bassState = FIN_SUM;
+        break;
+      }
+      if (timeKeep - susTimer > SUM_SUS_TIME)
+      {
+        bassState = FIN_SUM;
+        break;
+      }
+      // if (sum && linePressed)
+      // {
+      //   bassState = CHG_SUM;
+      //   break;
+      // }
+      break;
+    case FIN_SUM:
+      bassState = NONE;
+      synth.setNoteOff(0, currentNote, 0);
+      break;
+    case ON_PULL:
+      synth.setNoteOff(0, pastNote, 0);
+      synth.setInstrument(0, 0, BASS_PULL);
+      synth.setNoteOn(0, currentNote, VOLUME);
+      pullBorderTimer = timeKeep;
+      bassState = BLOCK_PULL;
+      break;
+    case BLOCK_PULL:
+      if (timeKeep - pullBorderTimer > PULL_BORDER_TIME)
+      {
+        bassState = SUS_PULL;
+        break;
+      }
+      break;
+    case SUS_PULL:
+      if (!linePressed || touchingLine)
+      {
+        bassState = FIN_PULL;
+        break;
+      }
+      if (timeKeep - susTimer > PULL_SUS_TIME)
+      {
+        bassState = FIN_PULL;
+        break;
+      }
+      if (linePressed && (currentNote != lastLoopNote))
+      {
+        if (pull_pitchbend_range_set)
+        {
+          bassState = CHG2_PULL;
+          break;
+        }
+        else
+        {
+          bassState = CHG_PULL;
+          break;
+        }
+        break;
+      }
+    case CHG_PULL:
+      synth.setPitchBendRange(0, 48);
+      pull_pitchbend_memory = currentNote - pastNote;
+      pull_pitchbend_base_memory = currentNote;
+      synth.setPitchBend(0, pull_pitchbend_memory);
+      bassState = SUS_PULL;
+      pull_pitchbend_range_set = true;
+      break;
+    case CHG2_PULL:
+      synth.setPitchBendRange(0, 48);
+      pull_pitchbend_memory = currentNote - pull_pitchbend_base_memory;
+      synth.setPitchBend(0, pull_pitchbend_memory);
+      bassState = SUS_PULL;
+      break;
+    case FIN_PULL:
+      if (pull_pitchbend_range_set)
+      {
+        synth.setPitchBend(0, 0);
+      }
+      bassState = NONE;
+      synth.setNoteOff(0, currentNote, 0);
+      break;
+    }
+
+    // 変化があったかどうかをチェック
+    bool hasChanged = (currentNote != pastCurrentNote) ||
+                      (goSign != pastGoSign) ||
+                      (isNotPassed != pastIsNotPassed) ||
+                      (state != pastState);
+
+    // 変化があった場合のみ出力
+    // if (hasChanged)
+    if (false)
+    {
+      USBSerial.print(num++);
+      USBSerial.print(" ");
+      USBSerial.print("CurrentState:");
+      USBSerial.print(" ");
+      USBSerial.print(stateToString(state));
+      USBSerial.print(" ");
+      USBSerial.print(timeKeep - pastTime);
+      USBSerial.print(" ");
+      USBSerial.print("CurrentNote:");
+      USBSerial.print(currentNote);
+      USBSerial.print(" ");
+      USBSerial.print("PastNote:");
+      USBSerial.print(pastNote);
+      USBSerial.print(" ");
+      USBSerial.print("isNotPassed");
+      USBSerial.print(" ");
+      USBSerial.print(isNotPassed);
+      USBSerial.print(" ");
+      USBSerial.print("GoSign:");
+      USBSerial.print(" ");
+      USBSerial.println(goSign);
+    }
+  }
+
+  pastState = state;
+  lastLoopNote = currentNote;
+  sum = false;
+  pull = false;
+
+  M5.update();
+  if (M5.BtnA.wasPressed())
+  {
+    if (outerState == MAIN)
+    {
+      outerState = MAIN_BASS;
+    }
+    else if (outerState == MAIN_BASS)
+    {
+      outerState = MAIN;
+    }
+  }
+}
