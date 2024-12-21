@@ -1,4 +1,5 @@
-/pico/
-/CH559_test/src/ch559.h
 
-/lang_ship_usb/
+/lang_ship_usb
+
+/UART_show/.pio/build/
+/UART_show/.pio/libdeps/
