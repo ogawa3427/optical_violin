@@ -1,2 +1,5 @@
 
 /lang_ship_usb
+
+/UART_show/.pio/build/
+/UART_show/.pio/libdeps/
