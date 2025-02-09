@@ -774,6 +774,8 @@ int pastCurrentNote = 0;
 bool pastGoSign = false;
 int num = 0;
 
+bool disAbleCfgCheck = false;
+
 void loop()
 {
 #ifdef SKIP_ALL_CFG
@@ -795,8 +797,37 @@ void loop()
     USBSerial.println(hexString);
   }
 
+  if (M5.BtnA.wasHold())
+  {
+    outerState = INIT;
+    disAbleCfgCheck = true;
+  }
+
   if (outerState == INIT)
   {
+    String configCheck = "";
+    readNVS("ctrKeyCfg_enter", configCheck);
+    if (configCheck == "" || disAbleCfgCheck)
+    {
+      outerState = INIT;
+      M5.Lcd.println("I1");
+    }
+    else
+    {
+      configCheck = "";
+      readNVS("bowCfg_upBow", configCheck);
+      if (configCheck == "" || disAbleCfgCheck)
+      {
+        outerState = INIT;
+        M5.Lcd.println("I2");
+      }
+      else
+      {
+        outerState = MAIN;
+        disAbleCfgCheck = false;
+        M5.Lcd.println("M");
+      }
+    }
 
 #ifdef USB_SERIAL
     USBSerial.println("INIT");
