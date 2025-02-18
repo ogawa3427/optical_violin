@@ -4,3 +4,6 @@
 /UART_show/.pio/build/
 /UART_show/.pio/libdeps/
 /UART_show/.vscode
+UART_show/.vscode/c_cpp_properties.json
+UART_show/.vscode/extensions.json
+/UART_show/.vscode
