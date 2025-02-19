@@ -782,17 +782,47 @@ bool disAbleCfgCheck = false;
 bool upBool = false;
 bool downBool = false;
 
+bool StopFE = false;
+bool firstLoop = true;
+
 void loop()
 {
+  firstLoop = true;
 #ifdef SKIP_ALL_CFG
   outerState = MAIN;
 #endif
 
   String receivedData = "";
   String hexString = "";
+
+  if (StopFE)
+  {
+    StopFE = false;
+    receivedData += 0xEF;
+  }
+
   if (Serial2.available())
   {
     receivedData = Serial2.readStringUntil('\n');
+    while (Serial2.available())
+    {
+      if (firstLoop)
+      {
+        receivedData += '\n';
+        firstLoop = false;
+      }
+
+      char c = Serial2.read();
+      if (c == '\n' || c == 0xFE)
+      {
+        if (c == 0xFE)
+        {
+          StopFE = true;
+        }
+        break;
+      }
+      receivedData += c;
+    }
     for (int i = 0; i < receivedData.length(); i++)
     {
       char hex[3];
@@ -1163,10 +1193,10 @@ void loop()
         }
         for (int i = 0; i < receivedData.length(); i++)
         {
-          // USBSerial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
-          // USBSerial.print(" ");                  // 数字の間にスペースを入れる
+          USBSerial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
+          USBSerial.print(" ");                  // 数字の間にスペースを入れる
         }
-        // USBSerial.println(); // 改行を出力
+        USBSerial.println(); // 改行を出力
         hold = true;
         // if (byte17 == 0xFF && byte5 == 0x03)
         // {
@@ -1219,7 +1249,7 @@ void loop()
           {
             // USBSerial.print(byte15, HEX);
             updateNote();
-            currentNote = tonedict[byte15];
+            currentNote = byte15;
             pastByte15 = byte15;
             pastByte16 = byte16;
             // M5.Lcd.println("ON");
@@ -1228,7 +1258,7 @@ void loop()
           {
             // USBSerial.print(byte16, HEX);
             updateNote();
-            currentNote = tonedict[byte16];
+            currentNote = byte16;
             pastByte15 = byte15;
             pastByte16 = byte16;
             // M5.Lcd.println("ON2");
@@ -1239,13 +1269,13 @@ void loop()
             {
               // USBSerial.print(byte15, HEX);
               pastNote = currentNote;
-              currentNote = tonedict[byte15];
+              currentNote = byte15;
             }
             else
             {
               // USBSerial.print(byte16, HEX);
               pastNote = currentNote;
-              currentNote = tonedict[byte16];
+              currentNote = byte16;
             }
             // M5.Lcd.println("ON3");
           }
@@ -1253,7 +1283,7 @@ void loop()
         else if (byte19 == 0x00 && byte15 != 0x00 && byte5 == 0x06 && byte17 == 0x00 && byte18 == 0x00)
         {
           // USBSerial.print(byte15, HEX);
-          currentNote = tonedict[byte15];
+          currentNote = byte15;
           // M5.Lcd.println("ON4");
         }
 
@@ -1425,10 +1455,12 @@ void loop()
 
     // 音名を取得
     String noteName = "NA";
-    if (currentNote > 0)
+    // if (currentNote > 0)
+    if (true)
     {
-      int noteIndex = currentNote % 12;
-      noteName = String(currentNote / 12) + noteNames[noteIndex];
+      char hexNote[5];                       // 16進数の文字列を格納するためのバッファ
+      sprintf(hexNote, "%02X", currentNote); // currentNoteを16進数で文字列化
+      noteName = String(hexNote);
     }
 
     // 音名に変化があった場合のみ表示を更新
@@ -1436,7 +1468,7 @@ void loop()
     {
       int filCN = DARKGREY;
       if (noteName != "NA")
-        filCN = GREEN;
+        filCN = YELLOW;
 
       M5.Lcd.setCursor(0, 0);
       M5.Lcd.fillRect(M5.Lcd.width() * 1 / 16, 0, M5.Lcd.width() * 14 / 16, M5.Lcd.height() * 2 / 3, filCN); // 上2/3をクリア
@@ -1468,7 +1500,7 @@ void loop()
       M5.Lcd.setTextSize(3);
       M5.Lcd.setTextColor(BLACK);
       M5.Lcd.drawCentreString(bowDir, M5.Lcd.width() / 2, M5.Lcd.height() * 2 / 3, 2);
-      lastBowDir = bowDir; // 前回の音名を更新
+      lastBowDir = bowDir;
     }
 
     // 現在の値を「過去の値」として保存
