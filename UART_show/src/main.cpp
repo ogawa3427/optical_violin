@@ -1186,17 +1186,17 @@ void loop()
         // 前回の受信から0.05秒以上経過しているか判定
         int delta = timeKeep - timeStamp_LastReceive;
         timeStamp_LastReceive = timeKeep;
-        if (delta > 25)
-        {
-          // USBSerial.print("---------------------------------");
-          // USBSerial.println(delta);
-        }
-        for (int i = 0; i < receivedData.length(); i++)
-        {
-          USBSerial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
-          USBSerial.print(" ");                  // 数字の間にスペースを入れる
-        }
-        USBSerial.println(); // 改行を出力
+        // if (delta > 25)
+        // {
+        //   // USBSerial.print("---------------------------------");
+        //   // USBSerial.println(delta);
+        // }
+        // for (int i = 0; i < receivedData.length(); i++)
+        // {
+        //   USBSerial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
+        //   USBSerial.print(" ");                  // 数字の間にスペースを入れる
+        // }
+        // USBSerial.println(); // 改行を出力
         hold = true;
         // if (byte17 == 0xFF && byte5 == 0x03)
         // {
@@ -1249,7 +1249,7 @@ void loop()
           {
             // USBSerial.print(byte15, HEX);
             updateNote();
-            currentNote = byte15;
+            currentNote = tonedict[byte15] - 12;
             pastByte15 = byte15;
             pastByte16 = byte16;
             // M5.Lcd.println("ON");
@@ -1258,7 +1258,7 @@ void loop()
           {
             // USBSerial.print(byte16, HEX);
             updateNote();
-            currentNote = byte16;
+            currentNote = tonedict[byte16] - 12;
             pastByte15 = byte15;
             pastByte16 = byte16;
             // M5.Lcd.println("ON2");
@@ -1269,13 +1269,13 @@ void loop()
             {
               // USBSerial.print(byte15, HEX);
               pastNote = currentNote;
-              currentNote = byte15;
+              currentNote = tonedict[byte15] - 12;
             }
             else
             {
               // USBSerial.print(byte16, HEX);
               pastNote = currentNote;
-              currentNote = byte16;
+              currentNote = tonedict[byte16] - 12;
             }
             // M5.Lcd.println("ON3");
           }
@@ -1283,7 +1283,7 @@ void loop()
         else if (byte19 == 0x00 && byte15 != 0x00 && byte5 == 0x06 && byte17 == 0x00 && byte18 == 0x00)
         {
           // USBSerial.print(byte15, HEX);
-          currentNote = byte15;
+          currentNote = tonedict[byte15] - 12;
           // M5.Lcd.println("ON4");
         }
 
@@ -1443,6 +1443,8 @@ void loop()
         M5.Lcd.fillRect(M5.Lcd.width() - LineWide, 0, LineWide, M5.Lcd.height(), ORANGE);
         M5.Lcd.fillRect(0, 0, LineWide, M5.Lcd.height(), ORANGE);
       }
+
+
       else
       {
         M5.Lcd.fillRect(M5.Lcd.width() - LineWide, 0, LineWide, M5.Lcd.height(), BLACK);
@@ -1455,12 +1457,10 @@ void loop()
 
     // 音名を取得
     String noteName = "NA";
-    // if (currentNote > 0)
-    if (true)
+    if (currentNote > 0)
     {
-      char hexNote[5];                       // 16進数の文字列を格納するためのバッファ
-      sprintf(hexNote, "%02X", currentNote); // currentNoteを16進数で文字列化
-      noteName = String(hexNote);
+      int noteIndex = currentNote % 12;
+      noteName = String(currentNote / 12) + noteNames[noteIndex];
     }
 
     // 音名に変化があった場合のみ表示を更新
