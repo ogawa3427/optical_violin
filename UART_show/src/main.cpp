@@ -674,12 +674,12 @@ void detection(String hexString, String receivedData)
 
     if (keys_stack_Top != last_keys_stack_Top)
     {
-      M5.Lcd.setCursor(0, 0);
-      M5.Lcd.fillScreen(BLACK);
-      if (keys_stack_Top != 0x00)
-      {
-        M5.Lcd.println(keyNameDict[keys_stack_Top]);
-      }
+      // M5.Lcd.setCursor(0, 0);
+      // M5.Lcd.fillScreen(BLACK);
+      // if (keys_stack_Top != 0x00)
+      // {
+      //   M5.Lcd.println(keyNameDict[keys_stack_Top]);
+      // }
     }
 
     last_keyboard_data = keyboard_data;
@@ -689,6 +689,9 @@ void detection(String hexString, String receivedData)
   }
 }
 static int sustainTimeKeep = 0;
+
+// 音名を決定するための配列
+const char *noteNames[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
 void setup()
 {
@@ -775,6 +778,9 @@ bool pastGoSign = false;
 int num = 0;
 
 bool disAbleCfgCheck = false;
+
+bool upBool = false;
+bool downBool = false;
 
 void loop()
 {
@@ -999,6 +1005,7 @@ void loop()
         outerState = MAIN;
         M5.Lcd.fillScreen(BLACK);
         M5.Lcd.setCursor(0, 0);
+        M5.Lcd.setTextColor(PINK, BLACK);
         M5.Lcd.println("Main mode");
       }
       else if (compare(hexString, ctrKeyCfg.enter))
@@ -1096,7 +1103,8 @@ void loop()
       outerState = MAIN;
       M5.Lcd.fillScreen(BLACK);
       M5.Lcd.setCursor(0, 0);
-      M5.Lcd.println("Main mode");
+      M5.Lcd.setTextColor(CYAN, BLACK);
+      M5.Lcd.println("OK");
     }
     else if (M5.BtnB.wasPressed())
     {
@@ -1128,9 +1136,9 @@ void loop()
       if (true)
       {
         M5.Lcd.setCursor(0, 0);
-        M5.Lcd.fillScreen(BLACK);
+        // M5.Lcd.fillScreen(BLACK);
         M5.Lcd.setTextColor(YELLOW, BLACK);
-        M5.Lcd.println("Main mode");
+        // M5.Lcd.println("Main mode");
         char byte5 = receivedData[4];
         char byte15 = receivedData[13]; // 15バイト目 (インデックスは0から始まるので14)
         char byte16 = receivedData[14];
@@ -1177,24 +1185,35 @@ void loop()
         {
           // USBSerial.print("UpScr");
           pastTime = timeKeep;
+          upBool = true;
+        }
+        else
+        {
+          upBool = false;
         }
         // else if (byte5 == 0x00 && byte15 == 0x00 && byte16 == 0x01 && byte17 == 0x00)
         if (compare(hexString, bowingKeyCfg.downBow))
         {
           // USBSerial.print("DownScr");
           pastTime = timeKeep;
+          downBool = true;
         }
-        else if (byte5 == 0x06)
+        else
+        {
+          downBool = false;
+        }
+
+        if (byte5 == 0x06)
         {
           M5.Lcd.setCursor(0, 0);
-          M5.Lcd.fillScreen(BLACK);
+          // M5.Lcd.fillScreen(BLACK);
           if (byte15 == 0x00 && byte16 == 0x00 && byte17 == 0x00 && byte18 == 0x00)
           {
             // USBSerial.print("OFF");
             hold = false;
             updateNote();
             currentNote = 0;
-            M5.Lcd.println("OFF");
+            // M5.Lcd.println("OFF");
           }
           else if (byte15 != 0x00 && byte16 == 0x00 && byte17 == 0x00 && byte18 == 0x00)
           {
@@ -1203,7 +1222,7 @@ void loop()
             currentNote = tonedict[byte15];
             pastByte15 = byte15;
             pastByte16 = byte16;
-            M5.Lcd.println("ON");
+            // M5.Lcd.println("ON");
           }
           else if (byte15 == 0x00 && byte16 != 0x00 && byte17 == 0x00 && byte18 == 0x00)
           {
@@ -1212,7 +1231,7 @@ void loop()
             currentNote = tonedict[byte16];
             pastByte15 = byte15;
             pastByte16 = byte16;
-            M5.Lcd.println("ON2");
+            // M5.Lcd.println("ON2");
           }
           else if (byte15 != 0x00 && byte16 != 0x00 && byte17 == 0x00 && byte18 == 0x00)
           {
@@ -1228,14 +1247,14 @@ void loop()
               pastNote = currentNote;
               currentNote = tonedict[byte16];
             }
-            M5.Lcd.println("ON3");
+            // M5.Lcd.println("ON3");
           }
         }
         else if (byte19 == 0x00 && byte15 != 0x00 && byte5 == 0x06 && byte17 == 0x00 && byte18 == 0x00)
         {
           // USBSerial.print(byte15, HEX);
           currentNote = tonedict[byte15];
-          M5.Lcd.println("ON4");
+          // M5.Lcd.println("ON4");
         }
 
         // if (receivedData[1] == 0x07 && receivedData[16] == 0x01)
@@ -1259,7 +1278,7 @@ void loop()
         // USBSerial.print(" pastHold:");
         // USBSerial.print(pastHold);
         // USBSerial.println();
-        M5.Lcd.println(currentNote);
+        // M5.Lcd.println(currentNote);
       }
     }
     isNotPassed = timeKeep - pastTime < SUS_BORDER;
@@ -1384,6 +1403,72 @@ void loop()
       USBSerial.print("GoSign:");
       USBSerial.print(" ");
       USBSerial.println(goSign);
+    }
+
+    if (pastGoSign != goSign)
+    {
+      int LineWide = M5.Lcd.width() / 16;
+      if (goSign)
+      {
+        M5.Lcd.fillRect(M5.Lcd.width() - LineWide, 0, LineWide, M5.Lcd.height(), ORANGE);
+        M5.Lcd.fillRect(0, 0, LineWide, M5.Lcd.height(), ORANGE);
+      }
+      else
+      {
+        M5.Lcd.fillRect(M5.Lcd.width() - LineWide, 0, LineWide, M5.Lcd.height(), BLACK);
+        M5.Lcd.fillRect(0, 0, LineWide, M5.Lcd.height(), BLACK);
+      }
+      // M5.Lcd.fillRect(M5.Lcd.width() * 32, M5.Lcd.height() * 32, M5.Lcd.width() * (1 - (2 / 32)), M5.Lcd.height() * (1 - (2 / 32)), BLACK);
+    }
+
+    static String lastNoteName = "NA"; // 前回の音名を保持する変数
+
+    // 音名を取得
+    String noteName = "NA";
+    if (currentNote > 0)
+    {
+      int noteIndex = currentNote % 12;
+      noteName = String(currentNote / 12) + noteNames[noteIndex];
+    }
+
+    // 音名に変化があった場合のみ表示を更新
+    if (noteName != lastNoteName)
+    {
+      int filCN = DARKGREY;
+      if (noteName != "NA")
+        filCN = GREEN;
+
+      M5.Lcd.setCursor(0, 0);
+      M5.Lcd.fillRect(M5.Lcd.width() * 1 / 16, 0, M5.Lcd.width() * 14 / 16, M5.Lcd.height() * 2 / 3, filCN); // 上2/3をクリア
+      M5.Lcd.setTextSize(3);
+      M5.Lcd.setTextColor(BLACK);
+      M5.Lcd.drawCentreString(noteName, M5.Lcd.width() / 2, M5.Lcd.height() / 8, 2);
+      lastNoteName = noteName; // 前回の音名を更新
+    }
+
+    String bowDir = "";
+    static String lastBowDir = "";
+    if (isNotPassed && upBool)
+    {
+      bowDir = "===>";
+    }
+    else if (isNotPassed && downBool)
+    {
+      bowDir = "<===";
+    }
+
+    int filCB = DARKGREY;
+    if (isNotPassed)
+      filCB = CYAN;
+
+    if (bowDir != lastBowDir)
+    {
+      M5.Lcd.setCursor(0, M5.Lcd.height() * 2 / 3);
+      M5.Lcd.fillRect(M5.Lcd.width() * 1 / 16, M5.Lcd.height() * 2 / 3, M5.Lcd.width() * 14 / 16, M5.Lcd.height() / 3, filCB); // 下1/3をクリア
+      M5.Lcd.setTextSize(3);
+      M5.Lcd.setTextColor(BLACK);
+      M5.Lcd.drawCentreString(bowDir, M5.Lcd.width() / 2, M5.Lcd.height() * 2 / 3, 2);
+      lastBowDir = bowDir; // 前回の音名を更新
     }
 
     // 現在の値を「過去の値」として保存
@@ -1706,30 +1791,29 @@ void loop()
 
     // 変化があった場合のみ出力
     // if (hasChanged)
-    if (false)
-    {
-      USBSerial.print(num++);
-      USBSerial.print(" ");
-      USBSerial.print("CurrentState:");
-      USBSerial.print(" ");
-      USBSerial.print(stateToString(state));
-      USBSerial.print(" ");
-      USBSerial.print(timeKeep - pastTime);
-      USBSerial.print(" ");
-      USBSerial.print("CurrentNote:");
-      USBSerial.print(currentNote);
-      USBSerial.print(" ");
-      USBSerial.print("PastNote:");
-      USBSerial.print(pastNote);
-      USBSerial.print(" ");
-      USBSerial.print("isNotPassed");
-      USBSerial.print(" ");
-      USBSerial.print(isNotPassed);
-      USBSerial.print(" ");
-      USBSerial.print("GoSign:");
-      USBSerial.print(" ");
-      USBSerial.println(goSign);
-    }
+    // {
+    //   USBSerial.print(num++);
+    //   USBSerial.print(" ");
+    //   USBSerial.print("CurrentState:");
+    //   USBSerial.print(" ");
+    //   USBSerial.print(stateToString(state));
+    //   USBSerial.print(" ");
+    //   USBSerial.print(timeKeep - pastTime);
+    //   USBSerial.print(" ");
+    //   USBSerial.print("CurrentNote:");
+    //   USBSerial.print(currentNote);
+    //   USBSerial.print(" ");
+    //   USBSerial.print("PastNote:");
+    //   USBSerial.print(pastNote);
+    //   USBSerial.print(" ");
+    //   USBSerial.print("isNotPassed");
+    //   USBSerial.print(" ");
+    //   USBSerial.print(isNotPassed);
+    //   USBSerial.print(" ");
+    //   USBSerial.print("GoSign:");
+    //   USBSerial.print(" ");
+    //   USBSerial.println(goSign);
+    // }
   }
 
   pastState = state;
