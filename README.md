@@ -11,7 +11,7 @@ The one that seems most likely to work is [here](https://github.com/ogawa3427/op
 It’s designed for the AtomS3.  
 
 ## Soldering Version
-For this version, you can refer to [this tweet]() and [this one]() as references.  
+For this version, you can refer to [this tweet](https://x.com/karaage0703/status/1804422980815990994) and [this one]() as references.  
 The Raspberry Pi Pico part is [here](https://github.com/ogawa3427/optical_violin/tree/main/fret).  
 The M5AtomS3Lite part is [here](https://github.com/ogawa3427/optical_violin/tree/main/bow).  
 
@@ -24,6 +24,6 @@ The M5AtomS3Lite part is [here](https://github.com/ogawa3427/optical_violin/tree
 AtomS3向けです  
 
 ## はんだバージョン
-こちらについては=>[こちらのツイート]()とか[こっち]()とかが参考になります  
+こちらについては=>[こちらのツイート](https://x.com/karaage0703/status/1804422980815990994)とか[こっち]()とかが参考になります  
 ラズピコ部分は[これ](https://github.com/ogawa3427/optical_violin/tree/main/fret)  
 M5AtomS3Lite部分は[これ](https://github.com/ogawa3427/optical_violin/tree/main/bow)  
