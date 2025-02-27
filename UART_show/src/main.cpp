@@ -346,7 +346,8 @@ enum OuterStates
   MAIN,
   MAIN_BASS,
   BOW,
-  TONE
+  TONE,
+  VOLUME
 };
 
 OuterStates outerState = INIT;
@@ -492,7 +493,7 @@ int instrument = 41;
 
 M5UnitSynth synth;
 
-int VOLUME = 127;
+int volumeInt = 127;
 
 uint32_t timer = 0;
 
@@ -704,7 +705,7 @@ void setup()
 
   synth.begin(&Serial1, UNIT_SYNTH_BAUD, 1, 2);
   synth.setInstrument(0, 0, INSTRUMENT_);
-  // synth.setNoteOn(0, NOTE_C6, VOLUME);
+  // synth.setNoteOn(0, NOTE_C6, volumeInt);
   // delay(1000);
   synth.setNoteOff(0, NOTE_C6, 0);
 
@@ -785,6 +786,8 @@ bool downBool = false;
 bool StopFE = false;
 bool firstLoop = true;
 
+bool volmeChanged = false;
+
 void loop()
 {
   firstLoop = true;
@@ -833,13 +836,53 @@ void loop()
     USBSerial.println(hexString);
   }
 
-  if (M5.BtnA.wasHold())
+  if (outerState == VOLUME)
   {
-    outerState = INIT;
-    disAbleCfgCheck = true;
-  }
+    if (hexString != "" && hexString != "00")
+    {
+      USBSerial.println("VOLUME  ing");
+      if (compare(hexString, bowingKeyCfg.upBow))
+      {
+        volmeChanged = true;
+        volumeInt = volumeInt + 2;
+      }
+      else if (compare(hexString, bowingKeyCfg.downBow))
+      {
+        volmeChanged = true;
+        volumeInt = volumeInt - 2;
+      }
+    }
 
-  if (outerState == INIT)
+    if (volumeInt < 0)
+    {
+      volumeInt = 0;
+    }
+    else if (volumeInt > 127)
+    {
+      volumeInt = 127;
+    }
+
+    if (volmeChanged)
+    {
+      volmeChanged = false;
+
+      USBSerial.println("VOLUME: " + String(volumeInt));
+
+      M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.setCursor(0, 0);
+      M5.Lcd.drawCenterString("BtnA:Save Back", 0, 0);
+      M5.Lcd.drawCenterString(String(volumeInt), 0, 10);
+      M5.Lcd.fillRect(0, 20, volumeInt, M5.Lcd.height() / 4, ORANGE);
+    }
+
+    M5.update();
+
+    if (M5.BtnA.wasReleased())
+    {
+      outerState = MAIN;
+    }
+  }
+  else if (outerState == INIT)
   {
     String configCheck = "";
     readNVS("ctrKeyCfg_enter", configCheck);
@@ -1149,6 +1192,13 @@ void loop()
   // else if (false)
   else if (outerState == MAIN)
   {
+    M5.update();
+    if (M5.BtnA.wasReleasedAfterHold())
+    {
+      outerState = VOLUME;
+      USBSerial.println("VOLUME");
+    }
+
     timeKeep = millis();
     // if (timeKeep % 1000 == 0)
     // {
@@ -1249,7 +1299,7 @@ void loop()
           {
             // USBSerial.print(byte15, HEX);
             updateNote();
-            currentNote = tonedict[byte15] - 12;
+            currentNote = tonedict[byte15] ;
             pastByte15 = byte15;
             pastByte16 = byte16;
             // M5.Lcd.println("ON");
@@ -1258,7 +1308,7 @@ void loop()
           {
             // USBSerial.print(byte16, HEX);
             updateNote();
-            currentNote = tonedict[byte16] - 12;
+            currentNote = tonedict[byte16] ;
             pastByte15 = byte15;
             pastByte16 = byte16;
             // M5.Lcd.println("ON2");
@@ -1269,13 +1319,13 @@ void loop()
             {
               // USBSerial.print(byte15, HEX);
               pastNote = currentNote;
-              currentNote = tonedict[byte15] - 12;
+              currentNote = tonedict[byte15] ;
             }
             else
             {
               // USBSerial.print(byte16, HEX);
               pastNote = currentNote;
-              currentNote = tonedict[byte16] - 12;
+              currentNote = tonedict[byte16] ;
             }
             // M5.Lcd.println("ON3");
           }
@@ -1283,7 +1333,7 @@ void loop()
         else if (byte19 == 0x00 && byte15 != 0x00 && byte5 == 0x06 && byte17 == 0x00 && byte18 == 0x00)
         {
           // USBSerial.print(byte15, HEX);
-          currentNote = tonedict[byte15] - 12;
+          currentNote = tonedict[byte15] ;
           // M5.Lcd.println("ON4");
         }
 
@@ -1347,7 +1397,7 @@ void loop()
       synth.setNoteOff(0, pastNote, 0);
       synth.setNoteOff(0, prevLoopNote, 0);
       synth.setNoteOff(0, pastPastNote, 0);
-      synth.setNoteOn(0, currentNote, VOLUME);
+      synth.setNoteOn(0, currentNote, volumeInt);
       if (goSign)
       {
         if (currentNote != prevLoopNote)
@@ -1383,7 +1433,7 @@ void loop()
       synth.setNoteOff(0, prevLoopNote, 0);
       synth.setNoteOff(0, pastNote, 0);
       synth.setNoteOff(0, pastPastNote, 0);
-      synth.setNoteOn(0, currentNote, VOLUME);
+      synth.setNoteOn(0, currentNote, volumeInt);
       if (goSign)
       {
         if (currentNote != prevLoopNote)
@@ -1443,8 +1493,6 @@ void loop()
         M5.Lcd.fillRect(M5.Lcd.width() - LineWide, 0, LineWide, M5.Lcd.height(), ORANGE);
         M5.Lcd.fillRect(0, 0, LineWide, M5.Lcd.height(), ORANGE);
       }
-
-
       else
       {
         M5.Lcd.fillRect(M5.Lcd.width() - LineWide, 0, LineWide, M5.Lcd.height(), BLACK);
@@ -1623,7 +1671,7 @@ void loop()
         {
           // USBSerial.print(byte15, HEX);
           updateNote();
-          currentNote = tonedict[byte15];
+          currentNote = tonedict[byte15] - 24;
           pastByte15 = byte15;
           pastByte16 = byte16;
           M5.Lcd.println("ON");
@@ -1633,7 +1681,7 @@ void loop()
         {
           // USBSerial.print(byte16, HEX);
           updateNote();
-          currentNote = tonedict[byte16];
+          currentNote = tonedict[byte16] - 24;
           pastByte15 = byte15;
           pastByte16 = byte16;
           M5.Lcd.println("ON2");
@@ -1645,14 +1693,14 @@ void loop()
           {
             // USBSerial.print(byte15, HEX);
             pastNote = currentNote;
-            currentNote = tonedict[byte15];
+            currentNote = tonedict[byte15] - 24;
             linePressed = true;
           }
           else
           {
             // USBSerial.print(byte16, HEX);
             pastNote = currentNote;
-            currentNote = tonedict[byte16];
+            currentNote = tonedict[byte16] - 24;
             linePressed = true;
           }
           M5.Lcd.println("ON3");
@@ -1661,7 +1709,7 @@ void loop()
       else if (byte19 == 0x00 && byte15 != 0x00 && byte5 == 0x06 && byte17 == 0x00 && byte18 == 0x00)
       {
         // USBSerial.print(byte15, HEX);
-        currentNote = tonedict[byte15];
+        currentNote = tonedict[byte15] - 24;
         M5.Lcd.println("ON4");
         linePressed = true;
       }
@@ -1692,7 +1740,7 @@ void loop()
     case ON_FINGER:
       synth.setNoteOff(0, pastNote, 0);
       synth.setInstrument(0, 0, FINGER_BASS);
-      synth.setNoteOn(0, currentNote, VOLUME);
+      synth.setNoteOn(0, currentNote, volumeInt);
       susTimer = timeKeep;
       break;
     case SUS_FINGER:
@@ -1710,7 +1758,7 @@ void loop()
       break;
     case CHG_FINGER:
       synth.setNoteOff(0, pastNote, 0);
-      synth.setNoteOn(0, currentNote, VOLUME);
+      synth.setNoteOn(0, currentNote, volumeInt);
       bassState = SUS_FINGER;
       break;
     case FIN_FINGER:
@@ -1720,7 +1768,7 @@ void loop()
     case ON_SUM:
       synth.setNoteOff(0, pastNote, 0);
       synth.setInstrument(0, 0, BASS_SUM);
-      synth.setNoteOn(0, currentNote, VOLUME);
+      synth.setNoteOn(0, currentNote, volumeInt);
       sumBorderTimer = timeKeep;
       bassState = BLOCK_SUM;
       break;
@@ -1755,7 +1803,7 @@ void loop()
     case ON_PULL:
       synth.setNoteOff(0, pastNote, 0);
       synth.setInstrument(0, 0, BASS_PULL);
-      synth.setNoteOn(0, currentNote, VOLUME);
+      synth.setNoteOn(0, currentNote, volumeInt);
       pullBorderTimer = timeKeep;
       bassState = BLOCK_PULL;
       break;
@@ -1815,37 +1863,55 @@ void loop()
       break;
     }
 
-    // 変化があったかどうかをチェック
-    bool hasChanged = (currentNote != pastCurrentNote) ||
-                      (goSign != pastGoSign) ||
-                      (isNotPassed != pastIsNotPassed) ||
-                      (state != pastState);
+    // 音名の表示
+    String noteName = "NA";
+    if (currentNote > 0) {
+        int noteIndex = currentNote % 12;
+        noteName = String(currentNote / 12) + noteNames[noteIndex];
+    }
+    M5.Lcd.setCursor(0, 0);
+    M5.Lcd.fillRect(0, 0, M5.Lcd.width(), M5.Lcd.height() / 3, BLACK);
+    M5.Lcd.setTextSize(2); // 字を小さくする
+    M5.Lcd.setTextColor(YELLOW);
+    M5.Lcd.drawCentreString(noteName, M5.Lcd.width() / 2, M5.Lcd.height() / 8, 2);
 
-    // 変化があった場合のみ出力
-    // if (hasChanged)
-    // {
-    //   USBSerial.print(num++);
-    //   USBSerial.print(" ");
-    //   USBSerial.print("CurrentState:");
-    //   USBSerial.print(" ");
-    //   USBSerial.print(stateToString(state));
-    //   USBSerial.print(" ");
-    //   USBSerial.print(timeKeep - pastTime);
-    //   USBSerial.print(" ");
-    //   USBSerial.print("CurrentNote:");
-    //   USBSerial.print(currentNote);
-    //   USBSerial.print(" ");
-    //   USBSerial.print("PastNote:");
-    //   USBSerial.print(pastNote);
-    //   USBSerial.print(" ");
-    //   USBSerial.print("isNotPassed");
-    //   USBSerial.print(" ");
-    //   USBSerial.print(isNotPassed);
-    //   USBSerial.print(" ");
-    //   USBSerial.print("GoSign:");
-    //   USBSerial.print(" ");
-    //   USBSerial.println(goSign);
-    // }
+    // PULL/SUM/noの入力状態の表示
+    String inputState = "no";
+    if (pull) {
+        inputState = "PULL";
+    } else if (sum) {
+        inputState = "SUM";
+    }
+    M5.Lcd.setCursor(0, M5.Lcd.height() / 3);
+    M5.Lcd.fillRect(0, M5.Lcd.height() / 3, M5.Lcd.width(), M5.Lcd.height() / 3, BLACK);
+    M5.Lcd.setTextSize(2); // 字を小さくする
+    M5.Lcd.setTextColor(CYAN);
+    M5.Lcd.drawCentreString(inputState, M5.Lcd.width() / 2, M5.Lcd.height() / 2.5, 2);
+
+    // Bassのステートマシンの状態の表示
+    const char* bassStateName = "";
+    switch (bassState) {
+        case NONE: bassStateName = "NONE"; break;
+        case ON_FINGER: bassStateName = "ON_FINGER"; break;
+        case SUS_FINGER: bassStateName = "SUS_FINGER"; break;
+        case CHG_FINGER: bassStateName = "CHG_FINGER"; break;
+        case FIN_FINGER: bassStateName = "FIN_FINGER"; break;
+        case ON_SUM: bassStateName = "ON_SUM"; break;
+        case BLOCK_SUM: bassStateName = "BLOCK_SUM"; break;
+        case SUS_SUM: bassStateName = "SUS_SUM"; break;
+        case FIN_SUM: bassStateName = "FIN_SUM"; break;
+        case ON_PULL: bassStateName = "ON_PULL"; break;
+        case BLOCK_PULL: bassStateName = "BLOCK_PULL"; break;
+        case SUS_PULL: bassStateName = "SUS_PULL"; break;
+        case CHG_PULL: bassStateName = "CHG_PULL"; break;
+        case CHG2_PULL: bassStateName = "CHG2_PULL"; break;
+        case FIN_PULL: bassStateName = "FIN_PULL"; break;
+    }
+    M5.Lcd.setCursor(0, 2 * M5.Lcd.height() / 3);
+    M5.Lcd.fillRect(0, 2 * M5.Lcd.height() / 3, M5.Lcd.width(), M5.Lcd.height() / 3, BLACK);
+    M5.Lcd.setTextSize(2); // 字を小さくする
+    M5.Lcd.setTextColor(GREEN);
+    M5.Lcd.drawCentreString(bassStateName, M5.Lcd.width() / 2, 5 * M5.Lcd.height() / 6, 2);
   }
 
   pastState = state;
@@ -1854,7 +1920,7 @@ void loop()
   pull = false;
 
   M5.update();
-  if (M5.BtnA.wasPressed())
+  if (M5.BtnA.wasPressed() && outerState != VOLUME)
   {
     if (outerState == MAIN)
     {
