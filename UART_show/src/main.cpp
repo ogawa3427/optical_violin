@@ -768,15 +768,25 @@ void setup()
   M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setBrightness(90);
   // USBSerial.println("Hello!");
+
+  bowingKeyCfg.upBow = "FE070004010102A71E66000200000000FF00";
+  bowingKeyCfg.downBow = "FE070004010102A71E660002000000000100";
+
+  synth.setInstrument(0, 0, BASS_SUM);
 }
 
 // CtrKeyCfg ctrKeyCfg;
 
 // 変数の初期化部分に過去の値を保存するための変数を追加
-uint32_t pastTimeKeep = 0;
+uint32_t pastTimeKeep = 2;
+uint32_t pastTimeKeep2 = 1;
+
 int pastCurrentNote = 0;
 bool pastGoSign = false;
 int num = 0;
+
+String bowDir_g = "";
+String lastBowDir_g = "";
 
 bool disAbleCfgCheck = false;
 
@@ -791,9 +801,9 @@ bool volmeChanged = false;
 void loop()
 {
   firstLoop = true;
-#ifdef SKIP_ALL_CFG
-  outerState = MAIN;
-#endif
+  // #ifdef SKIP_ALL_CFG
+  outerState = MAIN_BASS;
+  // #endif
 
   String receivedData = "";
   String hexString = "";
@@ -1299,7 +1309,7 @@ void loop()
           {
             // USBSerial.print(byte15, HEX);
             updateNote();
-            currentNote = tonedict[byte15] ;
+            currentNote = tonedict[byte15];
             pastByte15 = byte15;
             pastByte16 = byte16;
             // M5.Lcd.println("ON");
@@ -1308,7 +1318,7 @@ void loop()
           {
             // USBSerial.print(byte16, HEX);
             updateNote();
-            currentNote = tonedict[byte16] ;
+            currentNote = tonedict[byte16];
             pastByte15 = byte15;
             pastByte16 = byte16;
             // M5.Lcd.println("ON2");
@@ -1319,13 +1329,13 @@ void loop()
             {
               // USBSerial.print(byte15, HEX);
               pastNote = currentNote;
-              currentNote = tonedict[byte15] ;
+              currentNote = tonedict[byte15];
             }
             else
             {
               // USBSerial.print(byte16, HEX);
               pastNote = currentNote;
-              currentNote = tonedict[byte16] ;
+              currentNote = tonedict[byte16];
             }
             // M5.Lcd.println("ON3");
           }
@@ -1333,7 +1343,7 @@ void loop()
         else if (byte19 == 0x00 && byte15 != 0x00 && byte5 == 0x06 && byte17 == 0x00 && byte18 == 0x00)
         {
           // USBSerial.print(byte15, HEX);
-          currentNote = tonedict[byte15] ;
+          currentNote = tonedict[byte15];
           // M5.Lcd.println("ON4");
         }
 
@@ -1582,7 +1592,7 @@ void loop()
       // USBSerial.println(bowingKeyCfg.downBow);
 
       M5.Lcd.setCursor(0, 0);
-      M5.Lcd.fillScreen(BLACK);
+      // M5.Lcd.fillScreen(BLACK);
       M5.Lcd.setTextColor(YELLOW, BLACK);
       M5.Lcd.setTextSize(3);
       M5.Lcd.println("Bass");
@@ -1665,7 +1675,7 @@ void loop()
           hold = false;
           updateNote();
           currentNote = 0;
-          M5.Lcd.println("OFF");
+          // M5.Lcd.println("OFF");
         }
         else if (byte15 != 0x00 && byte16 == 0x00 && byte17 == 0x00 && byte18 == 0x00)
         {
@@ -1674,7 +1684,7 @@ void loop()
           currentNote = tonedict[byte15] - 24;
           pastByte15 = byte15;
           pastByte16 = byte16;
-          M5.Lcd.println("ON");
+          // M5.Lcd.println("ON");
           linePressed = true;
         }
         else if (byte15 == 0x00 && byte16 != 0x00 && byte17 == 0x00 && byte18 == 0x00)
@@ -1684,7 +1694,7 @@ void loop()
           currentNote = tonedict[byte16] - 24;
           pastByte15 = byte15;
           pastByte16 = byte16;
-          M5.Lcd.println("ON2");
+          // M5.Lcd.println("ON2");
           linePressed = true;
         }
         else if (byte15 != 0x00 && byte16 != 0x00 && byte17 == 0x00 && byte18 == 0x00)
@@ -1703,171 +1713,200 @@ void loop()
             currentNote = tonedict[byte16] - 24;
             linePressed = true;
           }
-          M5.Lcd.println("ON3");
+          // M5.Lcd.println("ON3");
         }
       }
       else if (byte19 == 0x00 && byte15 != 0x00 && byte5 == 0x06 && byte17 == 0x00 && byte18 == 0x00)
       {
         // USBSerial.print(byte15, HEX);
         currentNote = tonedict[byte15] - 24;
-        M5.Lcd.println("ON4");
+        // M5.Lcd.println("ON4");
         linePressed = true;
       }
 
-      M5.Lcd.println(currentNote);
+      if (upBool)
+        bowDir_g = "===>";
+      else if (downBool)
+        bowDir_g = "<===";
+
+      // M5.Lcd.println(currentNote);
     }
 
-    isNotPassed = timeKeep - pastTime < SUS_BORDER;
-    goSign = isNotPassed && currentNote != 0;
+    // isNotPassed = timeKeep - pastTime < SUS_BORDER;
+    // goSign = isNotPassed && currentNote != 0;
 
-    switch (bassState)
+    if (sum || pull)
     {
-    case NONE:
-      if (sum)
+      USBSerial.print("pastTimeKeep: ");
+      USBSerial.println(pastTimeKeep);
+      USBSerial.print("pastTimeKeep2: ");
+      USBSerial.println(pastTimeKeep2);
+
+      USBSerial.print("divider: ");
+      USBSerial.println(float(timeKeep - pastTimeKeep) / (pastTimeKeep - pastTimeKeep2));
+      // if (timeKeep - pastTimeKeep2 > 200 ||
+      if (float(timeKeep - pastTimeKeep) / (pastTimeKeep - pastTimeKeep2) > 0.09 || lastBowDir_g != bowDir_g)
       {
-        // bassState = COUNT_SUM;
-        bassState = ON_SUM;
+        synth.setNoteOff(0, pastNote, 0);
+        synth.setNoteOn(0, currentNote, volumeInt);
+        // synth.setNoteOn(0, 40, volumeInt);
+
+        pastNote = currentNote;
+        pastTimeKeep2 = pastTimeKeep;
+        pastTimeKeep = timeKeep;
+        lastBowDir_g = bowDir_g;
       }
-      else if (pull)
-      {
-        bassState = ON_PULL;
-      }
-      else if (releasedCK && !touchingLine && pastTouchingLine)
-      {
-        bassState = ON_FINGER;
-      }
-      break;
-    case ON_FINGER:
-      synth.setNoteOff(0, pastNote, 0);
-      synth.setInstrument(0, 0, FINGER_BASS);
-      synth.setNoteOn(0, currentNote, volumeInt);
-      susTimer = timeKeep;
-      break;
-    case SUS_FINGER:
-      if (currentNote != lastLoopNote && linePressed)
-      {
-        bassState = CHG_FINGER;
-        break;
-      }
-      // timeCheck
-      if (timeKeep - susTimer > FINGER_SUS_TIME)
-      {
-        bassState = FIN_FINGER;
-        break;
-      }
-      break;
-    case CHG_FINGER:
-      synth.setNoteOff(0, pastNote, 0);
-      synth.setNoteOn(0, currentNote, volumeInt);
-      bassState = SUS_FINGER;
-      break;
-    case FIN_FINGER:
-      bassState = NONE;
-      synth.setNoteOff(0, currentNote, 0);
-      break;
-    case ON_SUM:
-      synth.setNoteOff(0, pastNote, 0);
-      synth.setInstrument(0, 0, BASS_SUM);
-      synth.setNoteOn(0, currentNote, volumeInt);
-      sumBorderTimer = timeKeep;
-      bassState = BLOCK_SUM;
-      break;
-    case BLOCK_SUM:
-      if (timeKeep - sumBorderTimer > SUM_BORDER_TIME)
-      {
-        bassState = SUS_SUM;
-        break;
-      }
-      break;
-    case SUS_SUM:
-      if (!linePressed || touchingLine)
-      {
-        bassState = FIN_SUM;
-        break;
-      }
-      if (timeKeep - susTimer > SUM_SUS_TIME)
-      {
-        bassState = FIN_SUM;
-        break;
-      }
-      // if (sum && linePressed)
-      // {
-      //   bassState = CHG_SUM;
-      //   break;
-      // }
-      break;
-    case FIN_SUM:
-      bassState = NONE;
-      synth.setNoteOff(0, currentNote, 0);
-      break;
-    case ON_PULL:
-      synth.setNoteOff(0, pastNote, 0);
-      synth.setInstrument(0, 0, BASS_PULL);
-      synth.setNoteOn(0, currentNote, volumeInt);
-      pullBorderTimer = timeKeep;
-      bassState = BLOCK_PULL;
-      break;
-    case BLOCK_PULL:
-      if (timeKeep - pullBorderTimer > PULL_BORDER_TIME)
-      {
-        bassState = SUS_PULL;
-        break;
-      }
-      break;
-    case SUS_PULL:
-      if (!linePressed || touchingLine)
-      {
-        bassState = FIN_PULL;
-        break;
-      }
-      if (timeKeep - susTimer > PULL_SUS_TIME)
-      {
-        bassState = FIN_PULL;
-        break;
-      }
-      if (linePressed && (currentNote != lastLoopNote))
-      {
-        if (pull_pitchbend_range_set)
-        {
-          bassState = CHG2_PULL;
-          break;
-        }
-        else
-        {
-          bassState = CHG_PULL;
-          break;
-        }
-        break;
-      }
-    case CHG_PULL:
-      synth.setPitchBendRange(0, 48);
-      pull_pitchbend_memory = currentNote - pastNote;
-      pull_pitchbend_base_memory = currentNote;
-      synth.setPitchBend(0, pull_pitchbend_memory);
-      bassState = SUS_PULL;
-      pull_pitchbend_range_set = true;
-      break;
-    case CHG2_PULL:
-      synth.setPitchBendRange(0, 48);
-      pull_pitchbend_memory = currentNote - pull_pitchbend_base_memory;
-      synth.setPitchBend(0, pull_pitchbend_memory);
-      bassState = SUS_PULL;
-      break;
-    case FIN_PULL:
-      if (pull_pitchbend_range_set)
-      {
-        synth.setPitchBend(0, 0);
-      }
-      bassState = NONE;
-      synth.setNoteOff(0, currentNote, 0);
-      break;
     }
+
+    // switch (bassState)
+    // {
+    // case NONE:
+    //   if (sum)
+    //   {
+    //     // bassState = COUNT_SUM;
+    //     bassState = ON_SUM;
+    //   }
+    //   else if (pull)
+    //   {
+    //     bassState = ON_PULL;
+    //   }
+    //   else if (releasedCK && !touchingLine && pastTouchingLine)
+    //   {
+    //     bassState = ON_FINGER;
+    //   }
+    //   break;
+    // case ON_FINGER:
+    //   synth.setNoteOff(0, pastNote, 0);
+    //   synth.setInstrument(0, 0, FINGER_BASS);
+    //   synth.setNoteOn(0, currentNote, volumeInt);
+    //   susTimer = timeKeep;
+    //   break;
+    // case SUS_FINGER:
+    //   if (currentNote != lastLoopNote && linePressed)
+    //   {
+    //     bassState = CHG_FINGER;
+    //     break;
+    //   }
+    //   // timeCheck
+    //   if (timeKeep - susTimer > FINGER_SUS_TIME)
+    //   {
+    //     bassState = FIN_FINGER;
+    //     break;
+    //   }
+    //   break;
+    // case CHG_FINGER:
+    //   synth.setNoteOff(0, pastNote, 0);
+    //   synth.setNoteOn(0, currentNote, volumeInt);
+    //   bassState = SUS_FINGER;
+    //   break;
+    // case FIN_FINGER:
+    //   bassState = NONE;
+    //   synth.setNoteOff(0, currentNote, 0);
+    //   break;
+    // case ON_SUM:
+    //   synth.setNoteOff(0, pastNote, 0);
+    //   synth.setInstrument(0, 0, BASS_SUM);
+    //   synth.setNoteOn(0, currentNote, volumeInt);
+    //   sumBorderTimer = timeKeep;
+    //   bassState = BLOCK_SUM;
+    //   break;
+    // case BLOCK_SUM:
+    //   if (timeKeep - sumBorderTimer > SUM_BORDER_TIME)
+    //   {
+    //     bassState = SUS_SUM;
+    //     break;
+    //   }
+    //   break;
+    // case SUS_SUM:
+    //   if (!linePressed || touchingLine)
+    //   {
+    //     bassState = FIN_SUM;
+    //     break;
+    //   }
+    //   if (timeKeep - susTimer > SUM_SUS_TIME)
+    //   {
+    //     bassState = FIN_SUM;
+    //     break;
+    //   }
+    //   // if (sum && linePressed)
+    //   // {
+    //   //   bassState = CHG_SUM;
+    //   //   break;
+    //   // }
+    //   break;
+    // case FIN_SUM:
+    //   bassState = NONE;
+    //   synth.setNoteOff(0, currentNote, 0);
+    //   break;
+    // case ON_PULL:
+    //   synth.setNoteOff(0, pastNote, 0);
+    //   synth.setInstrument(0, 0, BASS_PULL);
+    //   synth.setNoteOn(0, currentNote, volumeInt);
+    //   pullBorderTimer = timeKeep;
+    //   bassState = BLOCK_PULL;
+    //   break;
+    // case BLOCK_PULL:
+    //   if (timeKeep - pullBorderTimer > PULL_BORDER_TIME)
+    //   {
+    //     bassState = SUS_PULL;
+    //     break;
+    //   }
+    //   break;
+    // case SUS_PULL:
+    //   if (!linePressed || touchingLine)
+    //   {
+    //     bassState = FIN_PULL;
+    //     break;
+    //   }
+    //   if (timeKeep - susTimer > PULL_SUS_TIME)
+    //   {
+    //     bassState = FIN_PULL;
+    //     break;
+    //   }
+    //   if (linePressed && (currentNote != lastLoopNote))
+    //   {
+    //     if (pull_pitchbend_range_set)
+    //     {
+    //       bassState = CHG2_PULL;
+    //       break;
+    //     }
+    //     else
+    //     {
+    //       bassState = CHG_PULL;
+    //       break;
+    //     }
+    //     break;
+    //   }
+    // case CHG_PULL:
+    //   synth.setPitchBendRange(0, 48);
+    //   pull_pitchbend_memory = currentNote - pastNote;
+    //   pull_pitchbend_base_memory = currentNote;
+    //   synth.setPitchBend(0, pull_pitchbend_memory);
+    //   bassState = SUS_PULL;
+    //   pull_pitchbend_range_set = true;
+    //   break;
+    // case CHG2_PULL:
+    //   synth.setPitchBendRange(0, 48);
+    //   pull_pitchbend_memory = currentNote - pull_pitchbend_base_memory;
+    //   synth.setPitchBend(0, pull_pitchbend_memory);
+    //   bassState = SUS_PULL;
+    //   break;
+    // case FIN_PULL:
+    //   if (pull_pitchbend_range_set)
+    //   {
+    //     synth.setPitchBend(0, 0);
+    //   }
+    //   bassState = NONE;
+    //   synth.setNoteOff(0, currentNote, 0);
+    //   break;
+    // }
 
     // 音名の表示
     String noteName = "NA";
-    if (currentNote > 0) {
-        int noteIndex = currentNote % 12;
-        noteName = String(currentNote / 12) + noteNames[noteIndex];
+    if (currentNote > 0)
+    {
+      int noteIndex = currentNote % 12;
+      noteName = String(currentNote / 12) + noteNames[noteIndex];
     }
     M5.Lcd.setCursor(0, 0);
     M5.Lcd.fillRect(0, 0, M5.Lcd.width(), M5.Lcd.height() / 3, BLACK);
@@ -1877,10 +1916,13 @@ void loop()
 
     // PULL/SUM/noの入力状態の表示
     String inputState = "no";
-    if (pull) {
-        inputState = "PULL";
-    } else if (sum) {
-        inputState = "SUM";
+    if (pull)
+    {
+      inputState = "PULL";
+    }
+    else if (sum)
+    {
+      inputState = "SUM";
     }
     M5.Lcd.setCursor(0, M5.Lcd.height() / 3);
     M5.Lcd.fillRect(0, M5.Lcd.height() / 3, M5.Lcd.width(), M5.Lcd.height() / 3, BLACK);
@@ -1889,29 +1931,63 @@ void loop()
     M5.Lcd.drawCentreString(inputState, M5.Lcd.width() / 2, M5.Lcd.height() / 2.5, 2);
 
     // Bassのステートマシンの状態の表示
-    const char* bassStateName = "";
-    switch (bassState) {
-        case NONE: bassStateName = "NONE"; break;
-        case ON_FINGER: bassStateName = "ON_FINGER"; break;
-        case SUS_FINGER: bassStateName = "SUS_FINGER"; break;
-        case CHG_FINGER: bassStateName = "CHG_FINGER"; break;
-        case FIN_FINGER: bassStateName = "FIN_FINGER"; break;
-        case ON_SUM: bassStateName = "ON_SUM"; break;
-        case BLOCK_SUM: bassStateName = "BLOCK_SUM"; break;
-        case SUS_SUM: bassStateName = "SUS_SUM"; break;
-        case FIN_SUM: bassStateName = "FIN_SUM"; break;
-        case ON_PULL: bassStateName = "ON_PULL"; break;
-        case BLOCK_PULL: bassStateName = "BLOCK_PULL"; break;
-        case SUS_PULL: bassStateName = "SUS_PULL"; break;
-        case CHG_PULL: bassStateName = "CHG_PULL"; break;
-        case CHG2_PULL: bassStateName = "CHG2_PULL"; break;
-        case FIN_PULL: bassStateName = "FIN_PULL"; break;
+    const char *bassStateName = "";
+    switch (bassState)
+    {
+    case NONE:
+      bassStateName = "NONE";
+      break;
+    case ON_FINGER:
+      bassStateName = "ON_FINGER";
+      break;
+    case SUS_FINGER:
+      bassStateName = "SUS_FINGER";
+      break;
+    case CHG_FINGER:
+      bassStateName = "CHG_FINGER";
+      break;
+    case FIN_FINGER:
+      bassStateName = "FIN_FINGER";
+      break;
+    case ON_SUM:
+      bassStateName = "ON_SUM";
+      break;
+    case BLOCK_SUM:
+      bassStateName = "BLOCK_SUM";
+      break;
+    case SUS_SUM:
+      bassStateName = "SUS_SUM";
+      break;
+    case FIN_SUM:
+      bassStateName = "FIN_SUM";
+      break;
+    case ON_PULL:
+      bassStateName = "ON_PULL";
+      break;
+    case BLOCK_PULL:
+      bassStateName = "BLOCK_PULL";
+      break;
+    case SUS_PULL:
+      bassStateName = "SUS_PULL";
+      break;
+    case CHG_PULL:
+      bassStateName = "CHG_PULL";
+      break;
+    case CHG2_PULL:
+      bassStateName = "CHG2_PULL";
+      break;
+    case FIN_PULL:
+      bassStateName = "FIN_PULL";
+      break;
     }
     M5.Lcd.setCursor(0, 2 * M5.Lcd.height() / 3);
     M5.Lcd.fillRect(0, 2 * M5.Lcd.height() / 3, M5.Lcd.width(), M5.Lcd.height() / 3, BLACK);
     M5.Lcd.setTextSize(2); // 字を小さくする
     M5.Lcd.setTextColor(GREEN);
     M5.Lcd.drawCentreString(bassStateName, M5.Lcd.width() / 2, 5 * M5.Lcd.height() / 6, 2);
+
+    // pastTimeKeep = timeKeep;
+    // pastTimeKeep2 = pastTimeKeep;
   }
 
   pastState = state;
@@ -1928,6 +2004,7 @@ void loop()
     }
     else if (outerState == MAIN_BASS)
     {
+      synth.setInstrument(0, 0, INSTRUMENT_);
       outerState = MAIN;
     }
   }
