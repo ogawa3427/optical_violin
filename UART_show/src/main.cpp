@@ -772,7 +772,7 @@ void setup()
   bowingKeyCfg.upBow = "FE070004010102A71E66000200000000FF00";
   bowingKeyCfg.downBow = "FE070004010102A71E660002000000000100";
 
-  synth.setInstrument(0, 0, BASS_SUM);
+  // synth.setInstrument(0, 0, BASS_SUM);
 }
 
 // CtrKeyCfg ctrKeyCfg;
@@ -802,7 +802,7 @@ void loop()
 {
   firstLoop = true;
   // #ifdef SKIP_ALL_CFG
-  outerState = MAIN_BASS;
+  // outerState = MAIN_BASS;
   // #endif
 
   String receivedData = "";
@@ -885,7 +885,7 @@ void loop()
       M5.Lcd.fillRect(0, 20, volumeInt, M5.Lcd.height() / 4, ORANGE);
     }
 
-    M5.update();
+    // M5.update();
 
     if (M5.BtnA.wasReleased())
     {
@@ -986,7 +986,7 @@ void loop()
     USBSerial.println("CONFIRM_CTR_KEY_CFG");
 #endif
 
-    M5.update();
+    // M5.update();
     if (hexString != "" && hexString != "00")
     {
       M5.Lcd.setCursor(0, 0);
@@ -1128,7 +1128,7 @@ void loop()
   }
   else if (outerState == CONFIRM_MUS_CFG)
   {
-    M5.update();
+    // M5.update();
     if (hexString != "" && hexString != "00")
     {
       M5.Lcd.setCursor(0, 0);
@@ -1202,7 +1202,7 @@ void loop()
   // else if (false)
   else if (outerState == MAIN)
   {
-    M5.update();
+    // M5.update();
     if (M5.BtnA.wasReleasedAfterHold())
     {
       outerState = VOLUME;
@@ -1747,8 +1747,14 @@ void loop()
       // if (timeKeep - pastTimeKeep2 > 200 ||
       if (float(timeKeep - pastTimeKeep) / (pastTimeKeep - pastTimeKeep2) > 0.09 || lastBowDir_g != bowDir_g)
       {
-        synth.setNoteOff(0, pastNote, 0);
-        synth.setNoteOn(0, currentNote, volumeInt);
+        synth.setNoteOff(0, pastNote - 12, 0);
+
+        if (sum)
+          synth.setInstrument(0, 0, BASS_PULL);
+        else if (pull)
+          synth.setInstrument(0, 0, BASS_SUM);
+
+        synth.setNoteOn(0, currentNote - 12, volumeInt);
         // synth.setNoteOn(0, 40, volumeInt);
 
         pastNote = currentNote;
@@ -1756,6 +1762,11 @@ void loop()
         pastTimeKeep = timeKeep;
         lastBowDir_g = bowDir_g;
       }
+    }
+
+    if (currentNote != lastLoopNote && currentNote == 0)
+    {
+      synth.setNoteOff(0, pastNote - 12, 0);
     }
 
     // switch (bassState)
@@ -1996,7 +2007,7 @@ void loop()
   pull = false;
 
   M5.update();
-  if (M5.BtnA.wasPressed() && outerState != VOLUME)
+  if (M5.BtnA.wasPressed())
   {
     if (outerState == MAIN)
     {
