@@ -491,7 +491,7 @@
                 ]
             },
             "defines": [
-                "PLATFORMIO=60117",
+                "PLATFORMIO=60118",
                 "ARDUINO_M5Stack_ATOMS3",
                 "ARDUINO_USB_MODE=1",
                 "ARDUINO_RUNNING_CORE=1",

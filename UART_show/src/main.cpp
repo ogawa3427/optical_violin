@@ -842,8 +842,8 @@ void loop()
       sprintf(hex, "%02X", receivedData[i]);
       hexString += hex;
     }
-    USBSerial.print("hexString: ");
-    USBSerial.println(hexString);
+    // USBSerial.print("hexString: ");
+    // USBSerial.println(hexString);
   }
 
   if (outerState == VOLUME)
@@ -1357,6 +1357,11 @@ void loop()
         {
           // USBSerial.print("DownBow");
           pastTime = timeKeep;
+        }
+
+        if ((upBool || downBool) && currentNote != 0)
+        {
+          USBSerial.println(currentNote);
         }
         // USBSerial.println();
         // USBSerial.print("CurrentNote:");
