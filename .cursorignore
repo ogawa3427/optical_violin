@@ -1,0 +1,10 @@
+**
+
+# 必要な親階層から順に再許可
+!UART_show/
+!UART_show/src/
+!UART_show/src/main.cpp
+!UART_show/src/keys.h
+!UART_show/src/note.h
+!UART_show/src/tone.h
+!app.rb
