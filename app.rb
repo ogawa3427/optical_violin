@@ -7,7 +7,7 @@ baud_rate1 = 31250 # MIDI標準ボーレート
 uart_port2 = 2 # UART2を使用
 tx_pin2 = 6
 rx_pin2 = 5
-baud_rate2 = 115200 # MIDI標準ボーレート
+baud_rate2 = 115200
 
 # ディスプレイの初期化と設定
 if Display.available?
@@ -47,21 +47,21 @@ else
 end
 
 # UARTポート2の初期化を追加
-puts "UART2(MIDI)を初期化します: ポート=#{uart_port2}, TX=#{tx_pin2}, RX=#{rx_pin2}, ボーレート=#{baud_rate2}, 8N1"
+puts "UART2(USB)を初期化します: ポート=#{uart_port2}, TX=#{tx_pin2}, RX=#{rx_pin2}, ボーレート=#{baud_rate2}, 8N1"
 sleep(0.1)
 # MIDI標準の 8bit, Non-parity, 1 stop bit で初期化 (Arduinoコード参考)
 # rx_buffer_size をハードウェアFIFO長(128)より大きい値(例: 256)に変更
-if UART.init(uart_port2, tx_pin2, rx_pin2, baud_rate2, 256, 256, 1)
+if UART.init(uart_port2, tx_pin2, rx_pin2, baud_rate2, 4096, 4096, 1)
   LED.set([0x00, 0xFF, 0x00])
-  Display.println("UART2(MIDI) init success (8N1)") # 設定情報を追加
-  puts "UART2(MIDI)初期化成功 (8N1)" # 設定情報を追加
+  Display.println("UART2(USB) init success (8N1)") # 設定情報を追加
+  puts "UART2(USB)初期化成功 (8N1)" # 設定情報を追加
   sleep(0.3)
   LED.set([0,0,0])
 else
   LED.set([0xFF, 0x00, 0x00])
   
-  puts "UART2(MIDI)初期化失敗" # 表示を更新
-  Display.println("UART2(MIDI) init failed") # 表示を更新
+  puts "UART2(USB)初期化失敗" # 表示を更新
+  Display.println("UART2(USB) init failed") # 表示を更新
   sleep(1)
   LED.set([0,0,0])
 end
@@ -153,8 +153,7 @@ while true
   # UART2からデータ受信チェック
   available_bytes = UART.available(uart_port2) # readable? の代わりに available を使用
   if available_bytes > 0
-    received_data = UART.read(uart_port2, available_bytes) # 取得したバイト数を指定して読み込み
-    unless received_data.empty?
+    received_data = UART.read_until(uart_port2, "\n", 4096)
       hex_string = received_data.bytes.map { |b| sprintf("%02X", b) }.join(' ')
       puts "UART2 Received (#{available_bytes} bytes, hex): #{hex_string}" # ログにバイト数を追加
 
@@ -166,7 +165,7 @@ while true
         Display.println("UART2 Received (#{available_bytes} bytes):") # ディスプレイ表示にバイト数を追加
         Display.println(hex_string) # 16進数で表示
       end
-    end
+    
   end
 
 
