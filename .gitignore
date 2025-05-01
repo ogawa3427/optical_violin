@@ -7,3 +7,5 @@
 UART_show/.vscode/c_cpp_properties.json
 UART_show/.vscode/extensions.json
 /UART_show/.vscode
+
+output.mrb
