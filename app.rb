@@ -158,6 +158,7 @@ while true
       hex_string = received_data.bytes.map { |b| sprintf("%02X", b) }.join(' ')
       puts "UART2 Received (#{available_bytes} bytes, hex): #{hex_string}" # ログにバイト数を追加
 
+      puts Utils.millis
       # ディスプレイが利用可能ならクリアして表示
       if Display.available?
         Display.clear()
