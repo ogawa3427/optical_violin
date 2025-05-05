@@ -452,22 +452,6 @@ while true
     Display.println("Bowing: #{isBowing}") # Bowing状態も表示
     Display.println("Uping: #{isUping}") # 弓の方向だけ表示
 
-    # === 既存の固定ノート再生ロジックはコメントアウト ===
-    # if isBowing
-    #   if isUping != newIsUping # この判定ロジックも怪しいのでコメントアウト
-    #     set_note_off(uart_port1, midi_channel, 72)
-    #     set_note_off(uart_port1, midi_channel, 60)
-    #   end
-    #   if isUping
-    #     set_note_on(uart_port1, midi_channel, 72, 100)
-    #   else
-    #     set_note_on(uart_port1, midi_channel, 60, 100)
-    #   end
-    # else
-    #   set_note_off(uart_port1, midi_channel, 72)
-    #   set_note_off(uart_port1, midi_channel, 60)
-    # end
-    # =============================================
   end
 
   # === 新しいMIDIノート送信ロジック ===
