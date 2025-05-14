@@ -8,8 +8,7 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "keys.h"
-
-// #define USB_SERIAL (1)
+// #define USB_USBSerial (1)
 // #define SKIP_ALL_CFG (1)
 
 // Refs
@@ -79,13 +78,13 @@ void readNVS(const char *key, String &value)
   esp_err_t err = nvs_open("storage", NVS_READWRITE, &my_handle);
   if (err != ESP_OK)
   {
-    USBSerial.printf("[READ]Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+    Serial.printf("[READ]Error (%s) opening NVS handle!\n", esp_err_to_name(err));
   }
   else
   {
 
 #ifdef USB_SERIAL
-    USBSerial.println("[READ]NVS handle opened successfully");
+    Serial.println("[READ]NVS handle opened successfully");
 #endif
 
     size_t required_size = 0; // valueのサイズを取得するための変数
@@ -99,22 +98,22 @@ void readNVS(const char *key, String &value)
         value = String(buffer);
 
 #ifdef USB_SERIAL
-        USBSerial.printf("%s = %s\n", key, value.c_str());
+        Serial.printf("%s = %s\n", key, value.c_str());
 #endif
       }
       else
       {
-        USBSerial.printf("[READ]Error (%s) reading %s!\n", esp_err_to_name(err), key);
+        Serial.printf("[READ]Error (%s) reading %s!\n", esp_err_to_name(err), key);
       }
       delete[] buffer;
     }
     else if (err == ESP_ERR_NVS_NOT_FOUND)
     {
-      USBSerial.printf("[READ]The value for %s is not initialized yet!\n", key);
+      Serial.printf("[READ]The value for %s is not initialized yet!\n", key);
     }
     else
     {
-      USBSerial.printf("[READ]Error (%s) reading %s!\n", esp_err_to_name(err), key);
+      Serial.printf("[READ]Error (%s) reading %s!\n", esp_err_to_name(err), key);
     }
     nvs_close(my_handle);
   }
@@ -129,38 +128,38 @@ void writeNVS(const char *key, const String &value)
     err = nvs_set_str(my_handle, key, value.c_str());
     if (err != ESP_OK)
     {
-      USBSerial.printf("[WRITE]Failed to update value for key: %s, error: %s\n", key, esp_err_to_name(err));
+      Serial.printf("[WRITE]Failed to update value for key: %s, error: %s\n", key, esp_err_to_name(err));
     }
     else
     {
 
 #ifdef USB_SERIAL
-      USBSerial.printf("[WRITE]Value updated successfully for key: %s\n", key);
+      Serial.printf("[WRITE]Value updated successfully for key: %s\n", key);
 #endif
     }
 
     err = nvs_commit(my_handle);
 
 #ifdef USB_SERIAL
-    USBSerial.println("[WRITE]Committing updates in NVS ...");
+    Serial.println("[WRITE]Committing updates in NVS ...");
 #endif
 
     if (err != ESP_OK)
     {
-      USBSerial.printf("[WRITE]Failed to commit updates for key: %s, error: %s\n", key, esp_err_to_name(err));
+      Serial.printf("[WRITE]Failed to commit updates for key: %s, error: %s\n", key, esp_err_to_name(err));
     }
     else
     {
 
 #ifdef USB_SERIAL
-      USBSerial.printf("[WRITE]Updates committed successfully for key: %s\n", key);
+      Serial.printf("[WRITE]Updates committed successfully for key: %s\n", key);
 #endif
     }
     nvs_close(my_handle);
   }
   else
   {
-    USBSerial.printf("[WRITE]Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+    Serial.printf("[WRITE]Error (%s) opening NVS handle!\n", esp_err_to_name(err));
   }
 }
 
@@ -170,10 +169,10 @@ void printAsHEX(const String &receivedData)
 #ifdef USB_SERIAL
   for (int i = 0; i < receivedData.length(); i++)
   {
-    USBSerial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
-    USBSerial.print(" ");                  // 数字の間にスペースを入れる
+    Serial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
+    Serial.print(" ");                  // 数字の間にスペースを入れる
   }
-  USBSerial.println(); // 改行を出力
+  Serial.println(); // 改行を出力
 #endif
 }
 
@@ -246,9 +245,9 @@ CtrKeyCfg readCtrKeyCfg()
 #ifdef USB_SERIAL
   for (int i = 0; i < cfg.enter.length(); i++)
   {
-    USBSerial.print(cfg.enter[i], HEX);
-    USBSerial.print(" ");
-    USBSerial.println();
+    Serial.print(cfg.enter[i], HEX);
+    Serial.print(" ");
+    Serial.println();
   }
 #endif
 
@@ -271,10 +270,10 @@ CtrKeyCfg readCtrKeyCfg()
 #ifdef USB_SERIAL
   for (int i = 0; i < cfg.pull_esc.length(); i++)
   {
-    USBSerial.print(cfg.pull_esc[i], HEX);
-    USBSerial.print(" ");
+    Serial.print(cfg.pull_esc[i], HEX);
+    Serial.print(" ");
   }
-  USBSerial.println();
+  Serial.println();
 #endif
 
   return cfg;
@@ -325,6 +324,7 @@ ToneKeyCfg readToneKeyCfg()
   cfg.b4_pull = String(temp.c_str());
   readNVS("toneKeyCfg_c5", temp);
   cfg.c5 = String(temp.c_str());
+  return cfg;
 }
 
 enum OuterStates
@@ -459,9 +459,9 @@ void promptingN(promptItem *promptBase1, int &index, int &lastIndex, OuterStates
     index++;
 
 #ifdef USB_SERIAL
-    USBSerial.println("(promptingN)");
-    USBSerial.print("index:");
-    USBSerial.println(index);
+    Serial.println("(promptingN)");
+    Serial.print("index:");
+    Serial.println(index);
 #endif
 
     if (index != lastIndex && index < lengthPromptBase)
@@ -471,8 +471,8 @@ void promptingN(promptItem *promptBase1, int &index, int &lastIndex, OuterStates
       M5.Lcd.println(promptBase1[index].prompt);
 
 #ifdef USB_SERIAL
-      USBSerial.print("prompt:");
-      USBSerial.println(promptBase1[index].prompt);
+      Serial.print("prompt:");
+      Serial.println(promptBase1[index].prompt);
 #endif
 
       lastIndex = index;
@@ -481,7 +481,7 @@ void promptingN(promptItem *promptBase1, int &index, int &lastIndex, OuterStates
     if (index == lengthPromptBase)
     {
 #ifdef USB_SERIAL
-      USBSerial.println("(promptingN)nextState");
+      Serial.println("(promptingN)nextState");
 #endif
 
       outerState = nextState;
@@ -547,20 +547,20 @@ void detection(String hexString, String receivedData)
   uint16_t ordinalKeysByte[6] = {receivedData[13], receivedData[14], receivedData[15], receivedData[16], receivedData[17], receivedData[18]};
 
 #ifdef USB_SERIAL
-  USBSerial.print("modKeysByte: ");
-  USBSerial.println(modKeysByte);
-  USBSerial.print("ordinalKeysByte1: ");
-  USBSerial.println(ordinalKeysByte[0]);
-  USBSerial.print("ordinalKeysByte2: ");
-  USBSerial.println(ordinalKeysByte[1]);
-  USBSerial.print("ordinalKeysByte3: ");
-  USBSerial.println(ordinalKeysByte[2]);
-  USBSerial.print("ordinalKeysByte4: ");
-  USBSerial.println(ordinalKeysByte[3]);
-  USBSerial.print("ordinalKeysByte5: ");
-  USBSerial.println(ordinalKeysByte[4]);
-  USBSerial.print("ordinalKeysByte6: ");
-  USBSerial.println(ordinalKeysByte[5]);
+  Serial.print("modKeysByte: ");
+  Serial.println(modKeysByte);
+  Serial.print("ordinalKeysByte1: ");
+  Serial.println(ordinalKeysByte[0]);
+  Serial.print("ordinalKeysByte2: ");
+  Serial.println(ordinalKeysByte[1]);
+  Serial.print("ordinalKeysByte3: ");
+  Serial.println(ordinalKeysByte[2]);
+  Serial.print("ordinalKeysByte4: ");
+  Serial.println(ordinalKeysByte[3]);
+  Serial.print("ordinalKeysByte5: ");
+  Serial.println(ordinalKeysByte[4]);
+  Serial.print("ordinalKeysByte6: ");
+  Serial.println(ordinalKeysByte[5]);
 #endif
 
   if (devType == 0x06)
@@ -625,26 +625,26 @@ void detection(String hexString, String receivedData)
 
     for (int i = 0; i < keyboard_data.size(); i++)
     {
-      USBSerial.printf("%02X ", keyboard_data[i]);
-      USBSerial.print(" ");
-      USBSerial.print(keyNameDict[keyboard_data[i]]);
-      USBSerial.print(" ");
+      Serial.printf("%02X ", keyboard_data[i]);
+      Serial.print(" ");
+      Serial.print(keyNameDict[keyboard_data[i]]);
+      Serial.print(" ");
     }
-    USBSerial.println();
+    Serial.println();
 
-    USBSerial.print("additional: ");
+    Serial.print("additional: ");
     for (int i = 0; i < additional.size(); i++)
     {
-      USBSerial.printf("%02X ", additional[i]);
+      Serial.printf("%02X ", additional[i]);
     }
-    USBSerial.println();
+    Serial.println();
 
-    USBSerial.print("deletional: ");
+    Serial.print("deletional: ");
     for (int i = 0; i < deletional.size(); i++)
     {
-      USBSerial.printf("%02X ", deletional[i]);
+      Serial.printf("%02X ", deletional[i]);
     }
-    USBSerial.println();
+    Serial.println();
 
     for (int i = 0; i < additional.size(); i++)
     {
@@ -658,11 +658,11 @@ void detection(String hexString, String receivedData)
 
     for (int i = 0; i < keys_stack.size(); i++)
     {
-      USBSerial.printf("%02X ", keys_stack[i]);
-      USBSerial.print(" ");
-      USBSerial.println(keyNameDict[keys_stack[i]]);
+      Serial.printf("%02X ", keys_stack[i]);
+      Serial.print(" ");
+      Serial.println(keyNameDict[keys_stack[i]]);
     }
-    USBSerial.println();
+    Serial.println();
 
     if (keys_stack.empty())
     {
@@ -700,7 +700,7 @@ void setup()
   Serial2.begin(115200, SERIAL_8N1, 5, 6);
 
   // #ifdef USB_SERIAL
-  USBSerial.begin(115200);
+  Serial.begin(115200);
   // #endif
 
   synth.begin(&Serial1, UNIT_SYNTH_BAUD, 1, 2);
@@ -721,20 +721,20 @@ void setup()
     err = nvs_flash_erase();
     if (err != ESP_OK)
     {
-      USBSerial.printf("Failed to erase NVS, error: %s\n", esp_err_to_name(err));
+      Serial.printf("Failed to erase NVS, error: %s\n", esp_err_to_name(err));
     }
     else
     {
       err = nvs_flash_init();
       if (err != ESP_OK)
       {
-        USBSerial.printf("Failed to initialize NVS, error: %s\n", esp_err_to_name(err));
+        Serial.printf("Failed to initialize NVS, error: %s\n", esp_err_to_name(err));
       }
     }
   }
   else if (err != ESP_OK)
   {
-    USBSerial.printf("Failed to initialize NVS, error: %s\n", esp_err_to_name(err));
+    Serial.printf("Failed to initialize NVS, error: %s\n", esp_err_to_name(err));
   }
 
   String value;
@@ -758,16 +758,16 @@ void setup()
   bowingKeyCfg = readBowingKeyCfg();
   outerState = INIT;
 
-  // USBSerial.println("3");
+  // Serial.println("3");
   // delay(1000);
-  // USBSerial.println("2");
+  // Serial.println("2");
   // delay(1000);
-  // USBSerial.println("1");
+  // Serial.println("1");
   // delay(1000);
-  // USBSerial.println("0");
+  // Serial.println("0");
   M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setBrightness(90);
-  // USBSerial.println("Hello!");
+  // Serial.println("Hello!");
 
   bowingKeyCfg.upBow = "FE070004010102A71E66000200000000FF00";
   bowingKeyCfg.downBow = "FE070004010102A71E660002000000000100";
@@ -842,15 +842,15 @@ void loop()
       sprintf(hex, "%02X", receivedData[i]);
       hexString += hex;
     }
-    // USBSerial.print("hexString: ");
-    // USBSerial.println(hexString);
+    // Serial.print("hexString: ");
+    // Serial.println(hexString);
   }
 
   if (outerState == VOLUME)
   {
     if (hexString != "" && hexString != "00")
     {
-      USBSerial.println("VOLUME  ing");
+      Serial.println("VOLUME  ing");
       if (compare(hexString, bowingKeyCfg.upBow))
       {
         volmeChanged = true;
@@ -876,7 +876,7 @@ void loop()
     {
       volmeChanged = false;
 
-      USBSerial.println("VOLUME: " + String(volumeInt));
+      Serial.println("VOLUME: " + String(volumeInt));
 
       M5.Lcd.fillScreen(BLACK);
       M5.Lcd.setCursor(0, 0);
@@ -919,8 +919,8 @@ void loop()
     }
 
 #ifdef USB_SERIAL
-    USBSerial.println("INIT");
-    USBSerial.println("Please press and hold [Enter]\nTo skip: set [Esc]");
+    Serial.println("INIT");
+    Serial.println("Please press and hold [Enter]\nTo skip: set [Esc]");
 #endif
 
     M5.Lcd.setCursor(0, 0);
@@ -938,7 +938,7 @@ void loop()
     {
 
 #ifdef USB_SERIAL
-      USBSerial.println("START_CTR_KEY_CFG");
+      Serial.println("START_CTR_KEY_CFG");
 #endif
 
       if (compare(hexString, ctrKeyCfg.esc))
@@ -961,7 +961,7 @@ void loop()
       M5.Lcd.fillScreen(BLACK);
       M5.Lcd.setCursor(0, 0);
       M5.Lcd.println("Release [Enter]");
-      USBSerial.println("-->ASK_CTR_KEY_CFG");
+      Serial.println("-->ASK_CTR_KEY_CFG");
     }
   }
   else if (outerState == ASK_CTR_KEY_CFG)
@@ -975,7 +975,7 @@ void loop()
       M5.Lcd.println("Push 4 keys to confirm.\nOK:BtnA\nRetry:BtnB");
 
 #ifdef USB_SERIAL
-      USBSerial.println("Push 4 keys to confirm. OK:BtnA Retry:BtnB");
+      Serial.println("Push 4 keys to confirm. OK:BtnA Retry:BtnB");
 #endif
     }
   }
@@ -983,7 +983,7 @@ void loop()
   {
 
 #ifdef USB_SERIAL
-    USBSerial.println("CONFIRM_CTR_KEY_CFG");
+    Serial.println("CONFIRM_CTR_KEY_CFG");
 #endif
 
     // M5.update();
@@ -1028,7 +1028,7 @@ void loop()
       M5.Lcd.println("Writing to NVS...");
 
 #ifdef USB_SERIAL
-      USBSerial.println("Writing to NVS...");
+      Serial.println("Writing to NVS...");
 #endif
 
       writeNVS("ctrKeyCfg_enter", ctrKeyCfg.enter);
@@ -1044,21 +1044,21 @@ void loop()
       M5.Lcd.println("Done!");
 
 #ifdef USB_SERIAL
-      USBSerial.println("Done!");
+      Serial.println("Done!");
 #endif
 
       ctrKeyCfg = readCtrKeyCfg();
 
 #ifdef USB_SERIAL
-      USBSerial.println("ctrKeyCfg:");
-      USBSerial.println(ctrKeyCfg.enter);
-      USBSerial.println(ctrKeyCfg.up);
-      USBSerial.println(ctrKeyCfg.down);
-      USBSerial.println(ctrKeyCfg.esc);
-      USBSerial.println(ctrKeyCfg.pull_enter);
-      USBSerial.println(ctrKeyCfg.pull_up);
-      USBSerial.println(ctrKeyCfg.pull_down);
-      USBSerial.println(ctrKeyCfg.pull_esc);
+      Serial.println("ctrKeyCfg:");
+      Serial.println(ctrKeyCfg.enter);
+      Serial.println(ctrKeyCfg.up);
+      Serial.println(ctrKeyCfg.down);
+      Serial.println(ctrKeyCfg.esc);
+      Serial.println(ctrKeyCfg.pull_enter);
+      Serial.println(ctrKeyCfg.pull_up);
+      Serial.println(ctrKeyCfg.pull_down);
+      Serial.println(ctrKeyCfg.pull_esc);
 #endif
 
       outerState = MUS_CFG_START;
@@ -1080,7 +1080,7 @@ void loop()
     {
 
 #ifdef USB_SERIAL
-      USBSerial.println("MUS_CFG_START");
+      Serial.println("MUS_CFG_START");
 #endif
 
       if (compare(hexString, ctrKeyCfg.esc))
@@ -1106,7 +1106,7 @@ void loop()
     {
 
 #ifdef USB_SERIAL
-      USBSerial.println("MUS_CFG_BUF");
+      Serial.println("MUS_CFG_BUF");
 #endif
 
       M5.Lcd.fillScreen(BLACK);
@@ -1174,13 +1174,13 @@ void loop()
       bowingKeyCfg = readBowingKeyCfg();
 
 #ifdef USB_SERIAL
-      USBSerial.println("bowingKeyCfg:");
-      USBSerial.println(bowingKeyCfg.rightClick);
-      USBSerial.println(bowingKeyCfg.leftClick);
-      USBSerial.println(bowingKeyCfg.upBow);
-      USBSerial.println(bowingKeyCfg.downBow);
-      USBSerial.println(bowingKeyCfg.pull_rightClick);
-      USBSerial.println(bowingKeyCfg.pull_leftClick);
+      Serial.println("bowingKeyCfg:");
+      Serial.println(bowingKeyCfg.rightClick);
+      Serial.println(bowingKeyCfg.leftClick);
+      Serial.println(bowingKeyCfg.upBow);
+      Serial.println(bowingKeyCfg.downBow);
+      Serial.println(bowingKeyCfg.pull_rightClick);
+      Serial.println(bowingKeyCfg.pull_leftClick);
 #endif
 
       outerState = MAIN;
@@ -1206,23 +1206,23 @@ void loop()
     if (M5.BtnA.wasReleasedAfterHold())
     {
       outerState = VOLUME;
-      USBSerial.println("VOLUME");
+      Serial.println("VOLUME");
     }
 
     timeKeep = millis();
     // if (timeKeep % 1000 == 0)
     // {
-    //   USBSerial.println(timeKeep);
+    //   Serial.println(timeKeep);
     // }
 
     if (hexString != "" && hexString != "00")
     {
-      // USBSerial.print("hex: ");
-      // USBSerial.println(hexString);
-      // USBSerial.print("ubo: ");
-      // USBSerial.println(bowingKeyCfg.upBow);
-      // USBSerial.print("dbo: ");
-      // USBSerial.println(bowingKeyCfg.downBow);
+      // Serial.print("hex: ");
+      // Serial.println(hexString);
+      // Serial.print("ubo: ");
+      // Serial.println(bowingKeyCfg.upBow);
+      // Serial.print("dbo: ");
+      // Serial.println(bowingKeyCfg.downBow);
       if (true)
       {
         M5.Lcd.setCursor(0, 0);
@@ -1235,37 +1235,37 @@ void loop()
         char byte17 = receivedData[15];
         char byte18 = receivedData[16];
         char byte19 = receivedData[17]; // 19バイト目 (インデックスは0から始まるので18)
-        // USBSerial.print(byte5, HEX);    // 15バイト目を16進数で出力
-        // USBSerial.print(" ");           // 数字の間にスペースを入れる
-        // USBSerial.print(byte15, HEX);   // 19バイト目を16進数で出力
-        // USBSerial.print(" ");           // 数字の間にスペースを入れる
-        // USBSerial.print(byte16, HEX);   // 5バイト目を16進数で出力
-        // USBSerial.print(" ");           // 数字の間にスペースを入れる
-        // USBSerial.print(byte17, HEX);   // 5バイト目を16進数で出力
-        // USBSerial.println();            // 改行を出力
+        // Serial.print(byte5, HEX);    // 15バイト目を16進数で出力
+        // Serial.print(" ");           // 数字の間にスペースを入れる
+        // Serial.print(byte15, HEX);   // 19バイト目を16進数で出力
+        // Serial.print(" ");           // 数字の間にスペースを入れる
+        // Serial.print(byte16, HEX);   // 5バイト目を16進数で出力
+        // Serial.print(" ");           // 数字の間にスペースを入れる
+        // Serial.print(byte17, HEX);   // 5バイト目を16進数で出力
+        // Serial.println();            // 改行を出力
         // 前回の受信から0.05秒以上経過しているか判定
         int delta = timeKeep - timeStamp_LastReceive;
         timeStamp_LastReceive = timeKeep;
         // if (delta > 25)
         // {
-        //   // USBSerial.print("---------------------------------");
-        //   // USBSerial.println(delta);
+        //   // Serial.print("---------------------------------");
+        //   // Serial.println(delta);
         // }
         // for (int i = 0; i < receivedData.length(); i++)
         // {
-        //   USBSerial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
-        //   USBSerial.print(" ");                  // 数字の間にスペースを入れる
+        //   Serial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
+        //   Serial.print(" ");                  // 数字の間にスペースを入れる
         // }
-        // USBSerial.println(); // 改行を出力
+        // Serial.println(); // 改行を出力
         hold = true;
         // if (byte17 == 0xFF && byte5 == 0x03)
         // {
-        //   // USBSerial.print("UpScr");
+        //   // Serial.print("UpScr");
         //   pastTime = timeKeep;
         // }
         // else if (byte17 == 0x01 && byte5 == 0x03)
         // {
-        //   // USBSerial.print("DownScr");
+        //   // Serial.print("DownScr");
         //   pastTime = timeKeep;
         // }
         // ここに新しい条件を追加
@@ -1273,7 +1273,7 @@ void loop()
         if (compare(hexString, bowingKeyCfg.upBow))
         // else if (byte5 == 0x00 && byte15 == 0x00 && byte16 == 0xFF && byte17 == 0x00)
         {
-          // USBSerial.print("UpScr");
+          // Serial.print("UpScr");
           pastTime = timeKeep;
           upBool = true;
         }
@@ -1284,7 +1284,7 @@ void loop()
         // else if (byte5 == 0x00 && byte15 == 0x00 && byte16 == 0x01 && byte17 == 0x00)
         if (compare(hexString, bowingKeyCfg.downBow))
         {
-          // USBSerial.print("DownScr");
+          // Serial.print("DownScr");
           pastTime = timeKeep;
           downBool = true;
         }
@@ -1299,7 +1299,7 @@ void loop()
           // M5.Lcd.fillScreen(BLACK);
           if (byte15 == 0x00 && byte16 == 0x00 && byte17 == 0x00 && byte18 == 0x00)
           {
-            // USBSerial.print("OFF");
+            // Serial.print("OFF");
             hold = false;
             updateNote();
             currentNote = 0;
@@ -1307,7 +1307,7 @@ void loop()
           }
           else if (byte15 != 0x00 && byte16 == 0x00 && byte17 == 0x00 && byte18 == 0x00)
           {
-            // USBSerial.print(byte15, HEX);
+            // Serial.print(byte15, HEX);
             updateNote();
             currentNote = tonedict[byte15];
             pastByte15 = byte15;
@@ -1316,7 +1316,7 @@ void loop()
           }
           else if (byte15 == 0x00 && byte16 != 0x00 && byte17 == 0x00 && byte18 == 0x00)
           {
-            // USBSerial.print(byte16, HEX);
+            // Serial.print(byte16, HEX);
             updateNote();
             currentNote = tonedict[byte16];
             pastByte15 = byte15;
@@ -1327,13 +1327,13 @@ void loop()
           {
             if (pastByte15 == 0x00 && pastByte16 != 0x00)
             {
-              // USBSerial.print(byte15, HEX);
+              // Serial.print(byte15, HEX);
               pastNote = currentNote;
               currentNote = tonedict[byte15];
             }
             else
             {
-              // USBSerial.print(byte16, HEX);
+              // Serial.print(byte16, HEX);
               pastNote = currentNote;
               currentNote = tonedict[byte16];
             }
@@ -1342,7 +1342,7 @@ void loop()
         }
         else if (byte19 == 0x00 && byte15 != 0x00 && byte5 == 0x06 && byte17 == 0x00 && byte18 == 0x00)
         {
-          // USBSerial.print(byte15, HEX);
+          // Serial.print(byte15, HEX);
           currentNote = tonedict[byte15];
           // M5.Lcd.println("ON4");
         }
@@ -1350,29 +1350,29 @@ void loop()
         // if (receivedData[1] == 0x07 && receivedData[16] == 0x01)
         if (hexString == bowingKeyCfg.upBow)
         {
-          // USBSerial.print("UpBow");
+          // Serial.print("UpBow");
           pastTime = timeKeep;
         }
         else if (hexString == bowingKeyCfg.downBow)
         {
-          // USBSerial.print("DownBow");
+          // Serial.print("DownBow");
           pastTime = timeKeep;
         }
 
         if ((upBool || downBool) && currentNote != 0)
         {
-          USBSerial.println(currentNote);
+          Serial.println(currentNote);
         }
-        // USBSerial.println();
-        // USBSerial.print("CurrentNote:");
-        // USBSerial.print(currentNote);
-        // USBSerial.print(" PastNote:");
-        // USBSerial.print(pastNote);
-        // USBSerial.print(" Hold:");
-        // USBSerial.print(hold);
-        // USBSerial.print(" pastHold:");
-        // USBSerial.print(pastHold);
-        // USBSerial.println();
+        // Serial.println();
+        // Serial.print("CurrentNote:");
+        // Serial.print(currentNote);
+        // Serial.print(" PastNote:");
+        // Serial.print(pastNote);
+        // Serial.print(" Hold:");
+        // Serial.print(hold);
+        // Serial.print(" pastHold:");
+        // Serial.print(pastHold);
+        // Serial.println();
         // M5.Lcd.println(currentNote);
       }
     }
@@ -1477,27 +1477,27 @@ void loop()
     // if (hasChanged)
     if (false)
     {
-      USBSerial.print(num++);
-      USBSerial.print(" ");
-      USBSerial.print("CurrentState:");
-      USBSerial.print(" ");
-      USBSerial.print(stateToString(state));
-      USBSerial.print(" ");
-      USBSerial.print(timeKeep - pastTime);
-      USBSerial.print(" ");
-      USBSerial.print("CurrentNote:");
-      USBSerial.print(currentNote);
-      USBSerial.print(" ");
-      USBSerial.print("PastNote:");
-      USBSerial.print(pastNote);
-      USBSerial.print(" ");
-      USBSerial.print("isNotPassed");
-      USBSerial.print(" ");
-      USBSerial.print(isNotPassed);
-      USBSerial.print(" ");
-      USBSerial.print("GoSign:");
-      USBSerial.print(" ");
-      USBSerial.println(goSign);
+      Serial.print(num++);
+      Serial.print(" ");
+      Serial.print("CurrentState:");
+      Serial.print(" ");
+      Serial.print(stateToString(state));
+      Serial.print(" ");
+      Serial.print(timeKeep - pastTime);
+      Serial.print(" ");
+      Serial.print("CurrentNote:");
+      Serial.print(currentNote);
+      Serial.print(" ");
+      Serial.print("PastNote:");
+      Serial.print(pastNote);
+      Serial.print(" ");
+      Serial.print("isNotPassed");
+      Serial.print(" ");
+      Serial.print(isNotPassed);
+      Serial.print(" ");
+      Serial.print("GoSign:");
+      Serial.print(" ");
+      Serial.println(goSign);
     }
 
     if (pastGoSign != goSign)
@@ -1584,17 +1584,17 @@ void loop()
     timeKeep = millis();
     // if (timeKeep % 1000 == 0)
     // {
-    //   USBSerial.println(timeKeep);
+    //   Serial.println(timeKeep);
     // }
 
     if (hexString != "" && hexString != "00")
     {
-      // USBSerial.print("hex: ");
-      // USBSerial.println(hexString);
-      // USBSerial.print("ubo: ");
-      // USBSerial.println(bowingKeyCfg.upBow);
-      // USBSerial.print("dbo: ");
-      // USBSerial.println(bowingKeyCfg.downBow);
+      // Serial.print("hex: ");
+      // Serial.println(hexString);
+      // Serial.print("ubo: ");
+      // Serial.println(bowingKeyCfg.upBow);
+      // Serial.print("dbo: ");
+      // Serial.println(bowingKeyCfg.downBow);
 
       M5.Lcd.setCursor(0, 0);
       // M5.Lcd.fillScreen(BLACK);
@@ -1607,51 +1607,51 @@ void loop()
       char byte17 = receivedData[15];
       char byte18 = receivedData[16];
       char byte19 = receivedData[17]; // 19バイト目 (インデックスは0から始まるので18)
-      // USBSerial.print(byte5, HEX);    // 15バイト目を16進数で出力
-      // USBSerial.print(" ");           // 数字の間にスペースを入れる
-      // USBSerial.print(byte15, HEX);   // 19バイト目を16進数で出力
-      // USBSerial.print(" ");           // 数字の間にスペースを入れる
-      // USBSerial.print(byte16, HEX);   // 5バイト目を16進数で出力
-      // USBSerial.print(" ");           // 数字の間にスペースを入れる
-      // USBSerial.print(byte17, HEX);   // 5バイト目を16進数で出力
-      // USBSerial.println();            // 改行を出力
+      // Serial.print(byte5, HEX);    // 15バイト目を16進数で出力
+      // Serial.print(" ");           // 数字の間にスペースを入れる
+      // Serial.print(byte15, HEX);   // 19バイト目を16進数で出力
+      // Serial.print(" ");           // 数字の間にスペースを入れる
+      // Serial.print(byte16, HEX);   // 5バイト目を16進数で出力
+      // Serial.print(" ");           // 数字の間にスペースを入れる
+      // Serial.print(byte17, HEX);   // 5バイト目を16進数で出力
+      // Serial.println();            // 改行を出力
       // 前回の受信から0.05秒以上経過しているか判定
       int delta = timeKeep - timeStamp_LastReceive;
       timeStamp_LastReceive = timeKeep;
       if (delta > 25)
       {
-        // USBSerial.print("---------------------------------");
-        // USBSerial.println(delta);
+        // Serial.print("---------------------------------");
+        // Serial.println(delta);
       }
       for (int i = 0; i < receivedData.length(); i++)
       {
-        // USBSerial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
-        // USBSerial.print(" ");                  // 数字の間にスペースを入れる
+        // Serial.print(receivedData[i], HEX); // 受信したデータを16進数で出力
+        // Serial.print(" ");                  // 数字の間にスペースを入れる
       }
-      // USBSerial.println(); // 改行を出力
+      // Serial.println(); // 改行を出力
       hold = true;
       // if (byte17 == 0xFF && byte5 == 0x03)
       // {
-      //   // USBSerial.print("UpScr");
+      //   // Serial.print("UpScr");
       //   pastTime = timeKeep;
       // }
       // else if (byte17 == 0x01 && byte5 == 0x03)
       // {
-      //   // USBSerial.print("DownScr");
+      //   // Serial.print("DownScr");
       //   pastTime = timeKeep;
       // }
       // ここに新しい条件を追加
       // if (byte5 == 0x00 && byte15 == 0x00 && byte16 == 0xFF && byte17 == 0x00)
       if (compare(hexString, bowingKeyCfg.upBow))
       {
-        // USBSerial.print("UpScr");
+        // Serial.print("UpScr");
         // pastTime = timeKeep;
         pull = true;
       }
       // else if (byte5 == 0x00 && byte15 == 0x00 && byte16 == 0x01 && byte17 == 0x00)
       else if (compare(hexString, bowingKeyCfg.downBow))
       {
-        // USBSerial.print("DownScr");
+        // Serial.print("DownScr");
         // pastTime = timeKeep;
         sum = true;
       }
@@ -1676,7 +1676,7 @@ void loop()
         M5.Lcd.fillScreen(BLACK);
         if (byte15 == 0x00 && byte16 == 0x00 && byte17 == 0x00 && byte18 == 0x00)
         {
-          // USBSerial.print("OFF");
+          // Serial.print("OFF");
           hold = false;
           updateNote();
           currentNote = 0;
@@ -1684,7 +1684,7 @@ void loop()
         }
         else if (byte15 != 0x00 && byte16 == 0x00 && byte17 == 0x00 && byte18 == 0x00)
         {
-          // USBSerial.print(byte15, HEX);
+          // Serial.print(byte15, HEX);
           updateNote();
           currentNote = tonedict[byte15] - 24;
           pastByte15 = byte15;
@@ -1694,7 +1694,7 @@ void loop()
         }
         else if (byte15 == 0x00 && byte16 != 0x00 && byte17 == 0x00 && byte18 == 0x00)
         {
-          // USBSerial.print(byte16, HEX);
+          // Serial.print(byte16, HEX);
           updateNote();
           currentNote = tonedict[byte16] - 24;
           pastByte15 = byte15;
@@ -1706,14 +1706,14 @@ void loop()
         {
           if (pastByte15 == 0x00 && pastByte16 != 0x00)
           {
-            // USBSerial.print(byte15, HEX);
+            // Serial.print(byte15, HEX);
             pastNote = currentNote;
             currentNote = tonedict[byte15] - 24;
             linePressed = true;
           }
           else
           {
-            // USBSerial.print(byte16, HEX);
+            // Serial.print(byte16, HEX);
             pastNote = currentNote;
             currentNote = tonedict[byte16] - 24;
             linePressed = true;
@@ -1723,7 +1723,7 @@ void loop()
       }
       else if (byte19 == 0x00 && byte15 != 0x00 && byte5 == 0x06 && byte17 == 0x00 && byte18 == 0x00)
       {
-        // USBSerial.print(byte15, HEX);
+        // Serial.print(byte15, HEX);
         currentNote = tonedict[byte15] - 24;
         // M5.Lcd.println("ON4");
         linePressed = true;
@@ -1742,13 +1742,13 @@ void loop()
 
     if (sum || pull)
     {
-      USBSerial.print("pastTimeKeep: ");
-      USBSerial.println(pastTimeKeep);
-      USBSerial.print("pastTimeKeep2: ");
-      USBSerial.println(pastTimeKeep2);
+      Serial.print("pastTimeKeep: ");
+      Serial.println(pastTimeKeep);
+      Serial.print("pastTimeKeep2: ");
+      Serial.println(pastTimeKeep2);
 
-      USBSerial.print("divider: ");
-      USBSerial.println(float(timeKeep - pastTimeKeep) / (pastTimeKeep - pastTimeKeep2));
+      Serial.print("divider: ");
+      Serial.println(float(timeKeep - pastTimeKeep) / (pastTimeKeep - pastTimeKeep2));
       // if (timeKeep - pastTimeKeep2 > 200 ||
       if (float(timeKeep - pastTimeKeep) / (pastTimeKeep - pastTimeKeep2) > 0.09 || lastBowDir_g != bowDir_g)
       {
