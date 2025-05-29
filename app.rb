@@ -1,9 +1,11 @@
 # 大事な定数
 # パルス間隔
 PULSE_INTERVAL = 7
+i = 0
 
 # パケット内のバイトインデックス
 PACKET_BOW_DIRECTION_INDEX = 14
+PACKET_MOUSE_WHEEL_INDEX = 11  # マウスホイール押し離し検出用のインデックス
 
 # UARTポート1の設定を追加
 uart_port1 = 1 # UART1を使用
@@ -34,7 +36,7 @@ if Display.available?
   Display.println("UART Monitor & MIDI Demo") # タイトル変更
   Display.println("Port1(MIDI): Baud: #{baud_rate1}") # ポート1の情報を更新
   Display.println("TX: #{tx_pin1}, RX: #{rx_pin1}")
-  Display.set_text_size(2)
+  Display.set_text_size(1)
   line_count = 5
 else
   line_count = 0
@@ -188,6 +190,87 @@ def set_note_off(port, channel, pitch, velocity = 0) # velocityは通常0だが�
   send_midi_command(port, cmd)
 end
 
+# 任意のCCを送信
+def set_cc(port, channel, cc_number, value)
+  cmd = [(0xb0 | (channel & 0x0f)), cc_number & 0x7f, value & 0x7f]
+  send_midi_command(port, cmd)
+end
+
+# Expression (CC11)
+def set_expression(port, channel, value)
+  set_cc(port, channel, 11, value)
+end
+
+# Channel Volume (CC7)
+def set_channel_volume(port, channel, value)
+  set_cc(port, channel, 7, value)
+end
+
+# Modulation Wheel (CC1)
+def set_modulation(port, channel, value)
+  set_cc(port, channel, 1, value)
+end
+
+# Pitch Bend （14bit）
+def set_pitch_bend(port, channel, bend_value)
+  # bend_value は -8192 … +8191 の範囲
+  raw = bend_value + 8192
+  lsb = raw & 0x7f
+  msb = (raw >> 7) & 0x7f
+  cmd = [(0xe0 | (channel & 0x0f)), lsb, msb]
+  send_midi_command(port, cmd)
+end
+
+# Reverb Send (CC91)
+def set_reverb_send(port, channel, value)
+  set_cc(port, channel, 91, value)
+end
+
+# Chorus Send (CC93)
+def set_chorus_send(port, channel, value)
+  set_cc(port, channel, 93, value)
+end
+
+# Brightness / Filter Cutoff (CC74)
+def set_brightness(port, channel, value)
+  set_cc(port, channel, 74, value)
+end
+
+# Portamento On/Off (CC65) + Time (CC5)
+def set_portamento(port, channel, on_off, time_value=nil)
+  set_cc(port, channel, 65, on_off ? 127 : 0)
+  set_cc(port, channel, 5, time_value) if time_value
+end
+
+# Sustain Pedal (CC64)
+def set_sustain(port, channel, on_off)
+  set_cc(port, channel, 64, on_off ? 127 : 0)
+end
+
+# Aftertouch (Channel Pressure)
+def set_aftertouch(port, channel, pressure_value)
+  cmd = [(0xd0 | (channel & 0x0f)), pressure_value & 0x7f]
+  send_midi_command(port, cmd)
+end
+
+# NRPN送信用：MSB(99), LSB(98), Data Entry MSB(6), LSB(38)
+def set_nrpn(port, channel, param_msb, param_lsb, value_msb, value_lsb=0)
+  cmds = []
+  cmds << [(0xb0|(channel&0x0f)), 99, param_msb&0x7f]
+  cmds << [(0xb0|(channel&0x0f)), 98, param_lsb&0x7f]
+  cmds << [(0xb0|(channel&0x0f)), 6,  value_msb&0x7f]
+  cmds << [(0xb0|(channel&0x0f)), 38, value_lsb&0x7f]
+  cmds.each { |cmd| send_midi_command(port, cmd) }
+end
+
+# Master Volume (NRPN 0x0E 0x73 → 3707h)
+def set_master_volume(port, channel, value_msb, value_lsb=0)
+  # NRPN #3707h → MSB=0x37, LSB=0x07
+  set_nrpn(port, channel, 0x37, 0x07, value_msb, value_lsb)
+end
+
+
+
 # MIDI送信関連
 midi_channel = 0 # チャンネル1 (0-15)
 # midi_note = 72 # これはもう使わんな
@@ -196,7 +279,8 @@ midi_velocity = 100 # ベロシティ (0-127)
 # midi_interval = 2 # 固定sleepにするので不要
 set_instrument(uart_port1, midi_channel, 0, 40) # 楽器設定 (バイオリン)
 
-Display.set_text_size(4)
+Display.set_text_size(2)
+
 pastnote = 0
 
 # バッファをクリアする関数を追加
@@ -213,7 +297,7 @@ def extract_packets(buffer)
 
   # バッファが十分なサイズになるまで処理
   while buffer.length >= 2 # 少なくとも識別子と種類を見るために2バイト必要
-    # FEで始まるパケットを探す
+    # FEで始まるパケットを探す  
     start_index = buffer.index(0xFE.chr)
 
     # パケットの開始マーカーが見つからない場合
@@ -267,6 +351,12 @@ newIsBowing = false # ループ内で計算する
 isUping = false
 newIsUping = false
 
+# マウスホイール押し離し状態
+isWheelPressed = false
+newIsWheelPressed = false
+lastWheelValue = 0x00  # 前回のマウスホイール値
+wheelStateChanged = false  # マウスホイール状態変化フラグ
+
 benchMark = 0
 benchMarkTime = 0
 
@@ -283,12 +373,18 @@ last_packet_values = []
 # 現在鳴っている音を追跡する変数
 current_playing_note = nil
 
+Display.clear()
+Display.println("L287")
 # メインループ
 while true
-  # benchMarkTime = Utils.millis()
+  # Display.println(i)
+
+  # puts i
+  benchMarkTime = Utils.millis()
   # puts benchMarkTime - benchMark
-  # benchMark = benchMarkTime
+  benchMark = benchMarkTime
   currentTimeStamp = Utils.millis()
+  # Display.println("L294")
 
   # 弓が動いているかどうかの判定 (最後にパケットを受信してから PULSE_INTERVAL 以内か)
   # bowTimeStamp は FE 04 または FE 08 受信時に更新される
@@ -298,7 +394,9 @@ while true
 
   # UART2からデータ受信チェック
   available_bytes = UART.available(uart_port2)
+  # available_bytes = 0
   if available_bytes > 0
+    # puts "available_bytes: #{available_bytes}"
     # 新しいデータを読み取り、バッファに追加
     new_data = UART.read(uart_port2, available_bytes)
     uart2_buffer += new_data
@@ -314,7 +412,20 @@ while true
 
         packet_type = packet.bytes[1]
         if packet_type == 0x04 && packet.length == 16
-          # 16バイトパケットの処理 (弓の方向)
+          # 16バイトパケットの処理 (弓の方向 + マウスホイール)
+          
+          # マウスホイール押し離し判定（11バイト目）
+          current_wheel_value = packet.bytes[PACKET_MOUSE_WHEEL_INDEX]
+          if current_wheel_value != lastWheelValue
+            # マウスホイール状態が変化した
+            # 4ビット目（0x08）が1なら押されている、0なら離されている
+            newIsWheelPressed = ((current_wheel_value & 0x04) != 0)
+            # puts "Mouse wheel: #{current_wheel_value.to_s(16)} -> #{newIsWheelPressed ? 'Pressed' : 'Released'}"
+            lastWheelValue = current_wheel_value
+            wheelStateChanged = true
+          end
+          
+          # 弓の方向判定（14バイト目）
           # Display.println("FE 04 パケット (16バイト)")
           # 14バイト目だけ表示
           # Display.println(packet.bytes[14].to_s)
@@ -332,6 +443,7 @@ while true
             bowTimeStamp = newBowTimeStamp # FE 04 受信時も更新
           end
           changeDisp = true if newIsUping != isUping
+          changeDisp = true if wheelStateChanged
         elsif packet_type == 0x08 && packet.length == 20
           # 20バイトパケットの処理 (キー入力)
           bowTimeStamp = newBowTimeStamp
@@ -411,8 +523,8 @@ while true
 
           # デバッグ用のスタック表示
           if !packet_stack.empty?
-            puts "Stack size: #{packet_stack.size}"
-            puts "内容: #{packet_stack.map { |v| sprintf("0x%02X", v) }.join(" ")}"
+            # puts "Stack size: #{packet_stack.size}"
+            # puts "内容: #{packet_stack.map { |v| sprintf("0x%02X", v) }.join(" ")}"
           end
         else
           # Display.println("不明なパケット")
@@ -443,15 +555,16 @@ while true
   # 状態を更新（表示の前に更新）
   isBowing = newIsBowing # isBowing を更新
   isUping = newIsUping
+  isWheelPressed = newIsWheelPressed  # マウスホイール状態も更新
   # bowTimeStamp = newBowTimeStamp # パケット受信時に更新するように変更
 
   # 弓の状態が変化した場合のみ表示を更新
   if changeDisp
-    Display.set_text_size(2)
+    Display.set_text_size(1)
     Display.clear()
     Display.println("Bowing: #{isBowing}") # Bowing状態も表示
     Display.println("Uping: #{isUping}") # 弓の方向だけ表示
-
+    Display.println("Wheel: #{isWheelPressed}") # マウスホイール状態も表示
   end
 
   # === 新しいMIDIノート送信ロジック ===
@@ -468,19 +581,52 @@ while true
     # まず現在鳴っている音を止める
     if current_playing_note
       set_note_off(uart_port1, midi_channel, current_playing_note)
-      puts "Note OFF: #{current_playing_note}" if current_playing_note # デバッグ用
+      # puts "Note OFF: #{current_playing_note}" if current_playing_note # デバッグ用
     end
 
     # 新しい音を鳴らす (target_noteがnilでなければ)
     if target_note && isBowing
       set_note_on(uart_port1, midi_channel, target_note, midi_velocity)
-      puts "Note ON: #{target_note} (Key: 0x#{packet_stack.last.to_s(16)})" # デバッグ用
+      # 新しいノートオンと同時に、現在のisWheelPressed状態に基づいてモジュレーションを設定
+      if isWheelPressed
+        set_modulation(uart_port1, midi_channel, 127)
+        # puts "Vibrato ON (new note, wheel IS pressed)"
+      else
+        # ホイールが押されていなければ、新しいノートではビブラートOFF
+        set_modulation(uart_port1, midi_channel, 0)
+        # puts "Vibrato OFF (new note, wheel NOT pressed)"
+      end
+      # puts "Note ON: #{target_note} (Key: 0x#{packet_stack.last.to_s(16)})" # デバッグ用
     end
 
     # 現在鳴っている音を更新
     current_playing_note = target_note
   end
+
+  # === マウスホイールビブラート制御 ===
+  # マウスホイール状態が変化した時のみビブラート制御
+  if wheelStateChanged && current_playing_note
+    if isWheelPressed
+      # 強めのビブラート（モジュレーション最大値）
+      set_modulation(uart_port1, midi_channel, 127)
+      # puts "Vibrato ON (強め)" # デバッグ用
+    else
+      # ビブラートオフ
+      set_modulation(uart_port1, midi_channel, 0)
+      # puts "Vibrato OFF" # デバッグ用
+    end
+  end
+  
+  # フラグをリセット
+  wheelStateChanged = false
+  # =======================================
+
+  # Display.println("L489")
+  # Display.clear()
   # ==================================
+  # puts "L498"
+  # sleep 1
+  i = i + 1
 
   # Blinkリロード要求をチェック
   if Blink.req_reload?
