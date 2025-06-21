@@ -53,16 +53,37 @@ def print_hex(data, start_index = 0, length = nil)
   return result.strip
 end
 
+# 色定数（RGB565形式）
+COLOR_BLACK = Display.color565(0, 0, 0)
+COLOR_WHITE = Display.color565(255, 255, 255)
+COLOR_ORANGE = Display.color565(255, 165, 0)
+COLOR_YELLOW = Display.color565(255, 255, 0)
+COLOR_CYAN = Display.color565(0, 255, 255)
+COLOR_DARKGREY = Display.color565(64, 64, 64)
+
+# 音名配列
+NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+# 表示状態の管理用変数
+$last_note_name = "NA"
+$last_go_sign = false
+$last_bow_dir = ""
+$display_width = 0
+$display_height = 0
+
 # ディスプレイの初期化と設定
 if Display.available?
   Display.clear() # ディスプレイをクリア
   Display.set_text_size(1) # テキストサイズを設定
-  Display.set_text_color(Display.color565(255, 255, 255)) # 白色テキスト
+  Display.set_text_color(COLOR_WHITE) # 白色テキスト
   Display.println("UART Monitor & MIDI Demo") # タイトル変更
   Display.println("Port1(MIDI): Baud: #{baud_rate1}") # ポート1の情報を更新
   Display.println("TX: #{tx_pin1}, RX: #{rx_pin1}")
   Display.set_text_size(1)
   line_count = 5
+  # 画面サイズを取得（仮定：128x64または320x240）
+  $display_width = 128  # 実際のディスプレイサイズに合わせて調整してください
+  $display_height = 128
 else
   line_count = 0
   # # puts "ディスプレイは利用できません"
@@ -447,6 +468,88 @@ def clear_uart_buffer(port)
   UART.read(port, 1) while UART.available(port) > 0
 end
 
+# 音名を取得する関数
+def get_note_name(note_number)
+  return "NA" if note_number.nil? || note_number <= 0
+  
+  note_index = note_number % 12
+  octave = note_number / 12
+  return "#{octave}#{NOTE_NAMES[note_index]}"
+end
+
+# バイオリンモード用のビジュアル表示を更新する関数
+def update_violin_display(is_playing, is_upbow, note_number, wheel_pressed)
+  return unless Display.available?
+  
+  # 演奏状態判定（弓が動いていて音が出ている状態）
+  go_sign = is_playing && !note_number.nil?
+  
+  # 左右の枠線表示（演奏状態の表示）
+  if go_sign != $last_go_sign
+    line_wide = $display_width / 16
+    if go_sign
+      Display.fill_rect($display_width - line_wide, 0, line_wide, $display_height, COLOR_ORANGE)
+      Display.fill_rect(0, 0, line_wide, $display_height, COLOR_ORANGE)
+    else
+      Display.fill_rect($display_width - line_wide, 0, line_wide, $display_height, COLOR_BLACK)
+      Display.fill_rect(0, 0, line_wide, $display_height, COLOR_BLACK)
+    end
+    $last_go_sign = go_sign
+  end
+  
+  # 音名の表示（中央上部）
+  note_name = get_note_name(note_number)
+  if note_name != $last_note_name
+    # 背景色を決定
+    fill_color = note_name != "NA" ? COLOR_YELLOW : COLOR_DARKGREY
+    
+    # 中央部分をクリア（左右の枠線は避ける）
+    Display.fill_rect($display_width / 16, 0, $display_width * 14 / 16, $display_height * 2 / 3, fill_color)
+    
+    # 音名を中央に表示
+    Display.set_text_size(3)
+    Display.set_text_color(COLOR_BLACK)
+    # テキストを中央に配置（フォントサイズ3では1文字約18ピクセル幅として計算）
+    text_width = note_name.length * 18
+    x_pos = ($display_width - text_width) / 2
+    y_pos = $display_height / 8
+    Display.set_cursor(x_pos, y_pos)
+    Display.print(note_name)
+    
+    $last_note_name = note_name
+  end
+  
+  # 弓の方向表示（下部）
+  bow_dir = ""
+  if is_playing && is_upbow
+    bow_dir = "===>"
+  elsif is_playing && !is_upbow
+    bow_dir = "<==="
+  end
+  
+  if bow_dir != $last_bow_dir
+    # 背景色を決定
+    fill_color = is_playing ? COLOR_CYAN : COLOR_DARKGREY
+    
+    # 下部をクリア（左右の枠線は避ける）
+    Display.fill_rect($display_width / 16, $display_height * 2 / 3, $display_width * 14 / 16, $display_height / 3, fill_color)
+    
+    # 弓の方向を中央に表示
+    if !bow_dir.empty?
+      Display.set_text_size(3)
+      Display.set_text_color(COLOR_BLACK)
+      # テキストを中央に配置
+      text_width = bow_dir.length * 18
+      x_pos = ($display_width - text_width) / 2
+      y_pos = $display_height * 2 / 3 + 10  # 少し下にオフセット
+      Display.set_cursor(x_pos, y_pos)
+      Display.print(bow_dir)
+    end
+    
+    $last_bow_dir = bow_dir
+  end
+end
+
 # パケット処理用のバッファ
 uart2_buffer = ""
 
@@ -546,8 +649,13 @@ current_playing_note = nil
 bass_last_bow_time = 0
 bass_bow_interval_threshold = 100  # ボウストロークの間隔閾値（ミリ秒）
 
-Display.clear()
-Display.println("L287")
+# 初期表示をクリア
+if Display.available?
+  Display.clear()
+  # 初期状態でビジュアル表示を設定（バイオリンモード）
+  update_violin_display(false, false, nil, false)
+end
+
 # メインループ
 while true
   # Display.println(i)
@@ -668,12 +776,24 @@ while true
             # 楽器を変更
             if violin_mode
               setup_realistic_violin(uart_port1, midi_channel)
-              Display.clear()
-              Display.println("Violin Mode")
+              # 表示状態をリセット
+              $last_note_name = "NA"
+              $last_go_sign = false
+              $last_bow_dir = ""
+              if Display.available?
+                Display.clear()
+                # バイオリンモードのビジュアル表示を初期化
+                update_violin_display(false, false, nil, false)
+              end
             else
               setup_realistic_slap_bass(uart_port1, midi_channel)
-              Display.clear()
-              Display.println("Bass Mode")
+              if Display.available?
+                Display.clear()
+                Display.set_text_size(2)
+                Display.set_text_color(COLOR_CYAN)
+                Display.set_cursor(0, 0)
+                Display.println("Bass Mode")
+              end
             end
             
             sleep(0.1) # チャタリング防止
@@ -830,13 +950,19 @@ while true
   isWheelPressed = newIsWheelPressed  # マウスホイール状態も更新
   # bowTimeStamp = newBowTimeStamp # パケット受信時に更新するように変更
 
-  # 弓の状態が変化した場合のみ表示を更新
-  if changeDisp
-    Display.set_text_size(1)
-    Display.clear()
-    Display.println("Bowing: #{isBowing}") # Bowing状態も表示
-    Display.println("Uping: #{isUping}") # 弓の方向だけ表示
-    Display.println("Wheel: #{isWheelPressed}") # マウスホイール状態も表示
+  # バイオリンモードのビジュアル表示を更新
+  if violin_mode
+    update_violin_display(isBowing, isUping, current_playing_note, isWheelPressed)
+  else
+    # ベースモードの場合は従来の表示を維持（必要に応じて後で更新）
+    if changeDisp
+      Display.set_text_size(1)
+      Display.clear()
+      Display.println("Bass Mode")
+      Display.println("Bowing: #{isBowing}")
+      Display.println("Uping: #{isUping}")
+      Display.println("Note: #{current_playing_note}")
+    end
   end
 
   # === MIDI演奏ロジック ===
