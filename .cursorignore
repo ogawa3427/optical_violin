@@ -8,3 +8,5 @@
 !UART_show/src/note.h
 !UART_show/src/tone.h
 !app.rb
+!usb_view.rbx
+!esc.rb

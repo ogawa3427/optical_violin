@@ -12,21 +12,21 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug",
-            "executable": "/Users/ogawa/Documents/GitHub/optical_violin/UART_show/.pio/build/m5stack-atoms3/firmware.elf",
-            "projectEnvName": "m5stack-atoms3",
+            "executable": "/Users/ogawa/Documents/GitHub/optical_violin/UART_show/.pio/build/atoms3/firmware.elf",
+            "projectEnvName": "atoms3",
             "toolchainBinDir": "/Users/ogawa/.platformio/packages/toolchain-xtensa-esp-elf/bin",
             "internalConsoleOptions": "openOnSessionStart",
             "preLaunchTask": {
                 "type": "PlatformIO",
-                "task": "Pre-Debug"
+                "task": "Pre-Debug (atoms3)"
             }
         },
         {
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (skip Pre-Debug)",
-            "executable": "/Users/ogawa/Documents/GitHub/optical_violin/UART_show/.pio/build/m5stack-atoms3/firmware.elf",
-            "projectEnvName": "m5stack-atoms3",
+            "executable": "/Users/ogawa/Documents/GitHub/optical_violin/UART_show/.pio/build/atoms3/firmware.elf",
+            "projectEnvName": "atoms3",
             "toolchainBinDir": "/Users/ogawa/.platformio/packages/toolchain-xtensa-esp-elf/bin",
             "internalConsoleOptions": "openOnSessionStart"
         },
@@ -34,8 +34,8 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (without uploading)",
-            "executable": "/Users/ogawa/Documents/GitHub/optical_violin/UART_show/.pio/build/m5stack-atoms3/firmware.elf",
-            "projectEnvName": "m5stack-atoms3",
+            "executable": "/Users/ogawa/Documents/GitHub/optical_violin/UART_show/.pio/build/atoms3/firmware.elf",
+            "projectEnvName": "atoms3",
             "toolchainBinDir": "/Users/ogawa/.platformio/packages/toolchain-xtensa-esp-elf/bin",
             "internalConsoleOptions": "openOnSessionStart",
             "loadMode": "manual"

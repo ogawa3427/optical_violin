@@ -20,11 +20,22 @@ baud_rate2 = 115_200
 
 # バイト配列を16進数で表示するヘルパー関数
 def print_hex(data, start_index = 0, length = nil)
-  length ||= data.length - start_index
-  end_index = [start_index + length, data.length].min - 1
+  return "nil" if data.nil?
+  return "empty" if data.empty?
+
+#   puts "not nil"
+  
+  # 文字列の場合はbytes配列に変換
+  byte_data = data.is_a?(String) ? data.bytes : data
+  
+  length ||= byte_data.length - start_index
+  return "invalid range" if start_index < 0 || start_index >= byte_data.length
+  
+  end_index = [start_index + length - 1, byte_data.length - 1].min
+  return "invalid range" if end_index < start_index
 
   result = ""
-  (start_index..end_index).each { |i| result += sprintf("%02X ", data[i]) }
+  (start_index..end_index).each { |i| result += sprintf("%02X ", byte_data[i]) }
   return result.strip
 end
 
@@ -82,8 +93,6 @@ else
   sleep(1)
   LED.set([0, 0, 0])
 end
-
-set_channel_volume(uart_port1, 0, 127)
 
 max_lines = 15
 
@@ -401,11 +410,9 @@ while true
   available_bytes = UART.available(uart_port2)
   # available_bytes = 0
   if available_bytes > 0
-    # puts "available_bytes: #{available_bytes}"
+    puts "available_bytes: #{available_bytes}"
     # 新しいデータを読み取り、バッファに追加
     new_data = UART.read(uart_port2, available_bytes)
-    # puts "new"
-    # puts new_data
     uart2_buffer += new_data
 
     # バッファからパケットを抽出
@@ -413,14 +420,22 @@ while true
 
     # 抽出したパケットを処理
     packets.each do |packet|
-        puts packet
+        puts "pct"
+# パケットをHEXでputsする
+        puts "packet: #{print_hex(packet.bytes)}"
       # パケットの処理
       if packet.bytes[0] == 0xFE
-        # puts "Complete Packet: #{print_hex(packet.bytes)}" # デバッグ用、一旦コメントアウト
+        puts "=== Complete Packet ==="
+        puts "Raw: #{print_hex(packet.bytes)}"
+        puts "Length: #{packet.length} bytes"
+        puts "Type: 0x#{packet.bytes[1].to_s(16).upcase}" if packet.length > 1
 
         packet_type = packet.bytes[1]
         if packet_type == 0x04 && packet.length == 16
           # 16バイトパケットの処理 (弓の方向 + マウスホイール)
+          puts "--- FE 04 Packet (16 bytes) ---"
+          puts "Bow direction (byte 14): 0x#{packet.bytes[PACKET_BOW_DIRECTION_INDEX].to_s(16).upcase}"
+          puts "Mouse wheel (byte 11): 0x#{packet.bytes[PACKET_MOUSE_WHEEL_INDEX].to_s(16).upcase}"
           
           # マウスホイール押し離し判定（11バイト目）
           current_wheel_value = packet.bytes[PACKET_MOUSE_WHEEL_INDEX]
@@ -465,11 +480,11 @@ while true
           # 20バイトパケットの処理 (キー入力)
           bowTimeStamp = newBowTimeStamp
 
-          # Display表示はデバッグ用なので一旦コメントアウト
-          # Display.println("FE 08 パケット (20バイト)")
-          # Display.println(print_hex(packet.bytes, 0, 8)) # 最初の8バイト
-          # Display.println(print_hex(packet.bytes, 8, 8)) # 次の8バイト
-          # Display.println(print_hex(packet.bytes, 16, 4)) # 最後の4バイト
+          puts "--- FE 08 Packet (20 bytes) ---"
+          puts "Bytes 0-7:   #{print_hex(packet.bytes, 0, 8)}"
+          puts "Bytes 8-15:  #{print_hex(packet.bytes, 8, 8)}"
+          puts "Bytes 16-19: #{print_hex(packet.bytes, 16, 4)}"
+          puts "Key area (12-15): #{print_hex(packet.bytes, 12, 4)}"
 
           # 13-16バイト目（インデックス12-15）を取得
           current_values = []
@@ -544,8 +559,9 @@ while true
             # puts "内容: #{packet_stack.map { |v| sprintf("0x%02X", v) }.join(" ")}"
           end
         else
-          # Display.println("不明なパケット")
-          # Display.println(print_hex(packet.bytes, 0, 8)) # 最初の8バイト表示
+          puts "--- Unknown Packet ---"
+          puts "Type: 0x#{packet_type.to_s(16).upcase}, Length: #{packet.length}"
+          puts "Data: #{print_hex(packet.bytes, 0, [packet.length, 16].min)}" # 最大16バイトまで表示
         end
       else
         # 無視する（何も処理しない）

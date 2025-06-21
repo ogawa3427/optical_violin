@@ -9,7 +9,7 @@
 #include "nvs.h"
 #include "keys.h"
 
-#define USB_SERIAL (1)
+// #define USB_SERIAL (1)
 // #define SKIP_ALL_CFG (1)
 
 // Refs
