@@ -17,7 +17,7 @@ KEYBOARD_LEFT_SHIFT_BIT = 0x02 # 左シフトは修飾キーの1ビット目
 KEYBOARD_CAPS_LOCK = 0x39    # CapsLockキー
 
 # MIDI楽器定数
-VIOLIN_INSTRUMENT = 40
+VIOLIN_INSTRUMENT = 41
 BASS_SUM_INSTRUMENT = 38
 BASS_PULL_INSTRUMENT = 37
 
@@ -294,7 +294,141 @@ def set_master_volume(port, channel, value_msb, value_lsb=0)
   set_nrpn(port, channel, 0x37, 0x07, value_msb, value_lsb)
 end
 
+# リアルなバイオリン音色設定 (ビブラート除く)
+def setup_realistic_violin(port, channel)
+  # 1. バイオリン楽器選択 (Program Change 41)
+  set_instrument(port, channel, 0, VIOLIN_INSTRUMENT)
+  sleep(0.02)
+  
+  # 2. エンベロープ調整 - 弓の素早い立ち上がり
+  # Attack Time (NRPN 0163h) - 素早く
+  set_nrpn(port, channel, 0x01, 0x63, 0x20)
+  sleep(0.01)
+  # Decay Time (NRPN 0164h) - 中程度
+  set_nrpn(port, channel, 0x01, 0x64, 0x40)
+  sleep(0.01)
+  # Release Time (NRPN 0166h) - やや長め
+  set_nrpn(port, channel, 0x01, 0x66, 0x50)
+  sleep(0.01)
+  
+  # 3. イコライザー調整 - 弦の明瞭感強調
+  # Mid-High band boost (NRPN 3702h) +6dB
+  set_nrpn(port, channel, 0x37, 0x02, 0x60)
+  sleep(0.01)
+  # High band boost (NRPN 3703h) +6dB
+  set_nrpn(port, channel, 0x37, 0x03, 0x60)
+  sleep(0.01)
+  
+  # 4. リバーブ設定 - Hall1で空間の奥行き
+  set_cc(port, channel, 0x69, 0x03)  # REV_TYPE = Hall1
+  sleep(0.01)
+  set_cc(port, channel, 0x25, 0x80)  # GMREV_SEND = デフォルト
+  sleep(0.01)
+  
+  # 5. コーラス無効 (ビブラート抜きのため)
+  set_cc(port, channel, 0x26, 0x00)  # GMCHR_SEND = 0
+  sleep(0.01)
+  
+  # 6. 不要なエフェクト無効
+  set_nrpn(port, channel, 0x37, 0x5F, 0x00)  # MIC/ECHO OFF
+  sleep(0.01)
+  
+  # 7. ボリューム調整
+  set_cc(port, channel, 7, 100)  # Channel Volume
+  sleep(0.01)
+end
 
+# リアルなスラップベース音色設定
+def setup_realistic_slap_bass(port, channel)
+  # 1. スラップベース楽器選択 (Program Change 37)
+  set_instrument(port, channel, 0, 37)  # Slap Bass 1
+  sleep(0.02)
+  
+  # 2. エンベロープ調整 - パキッとした立ち上がり
+  # Attack Time (NRPN 0163h) - 非常に短く
+  set_nrpn(port, channel, 0x01, 0x63, 0x10)
+  sleep(0.01)
+  # Decay Time (NRPN 0164h) - 素早く
+  set_nrpn(port, channel, 0x01, 0x64, 0x20)
+  sleep(0.01)
+  # Release Time (NRPN 0166h) - 適度に
+  set_nrpn(port, channel, 0x01, 0x66, 0x30)
+  sleep(0.01)
+  
+  # 3. イコライザー調整 - パチッ感強調
+  # Mid Low band boost (NRPN 3701h) +6~9dB
+  set_nrpn(port, channel, 0x37, 0x01, 0x50)
+  sleep(0.01)
+  # High band boost (NRPN 3703h) +3dB
+  set_nrpn(port, channel, 0x37, 0x03, 0x30)
+  sleep(0.01)
+  
+  # 4. リバーブ設定 - Hall2でほんのり空間
+  set_cc(port, channel, 0x69, 0x04)  # REV_TYPE = Hall2
+  sleep(0.01)
+  set_cc(port, channel, 0x25, 0x80)  # GMREV_SEND = デフォルト
+  sleep(0.01)
+  
+  # 5. コーラス設定 - Chorus3で軽く
+  set_cc(port, channel, 0x6A, 0x02)  # CHORUS_TYPE = Chorus3
+  sleep(0.01)
+  set_cc(port, channel, 0x26, 0x80)  # GMCHR_SEND = デフォルト
+  sleep(0.01)
+  
+  # 6. 不要なエフェクト無効
+  set_nrpn(port, channel, 0x37, 0x5F, 0x00)  # MIC/ECHO OFF
+  sleep(0.01)
+  
+  # 7. ボリューム調整
+  set_cc(port, channel, 7, 110)  # Channel Volume (少し大きめ)
+  sleep(0.01)
+end
+
+# Pull用リアルスラップベース音色設定
+def setup_realistic_slap_bass_pull(port, channel)
+  # 1. Pull Bass楽器選択 (Program Change 36)
+  set_instrument(port, channel, 0, 36)  # Slap Bass 2
+  sleep(0.02)
+  
+  # 2. エンベロープ調整 - よりソフトな立ち上がり
+  # Attack Time (NRPN 0163h) - 短く
+  set_nrpn(port, channel, 0x01, 0x63, 0x18)
+  sleep(0.01)
+  # Decay Time (NRPN 0164h) - 素早く
+  set_nrpn(port, channel, 0x01, 0x64, 0x25)
+  sleep(0.01)
+  # Release Time (NRPN 0166h) - やや長め
+  set_nrpn(port, channel, 0x01, 0x66, 0x40)
+  sleep(0.01)
+  
+  # 3. イコライザー調整 - 低音域重視
+  # Low band boost (NRPN 3700h) +3dB
+  set_nrpn(port, channel, 0x37, 0x00, 0x30)
+  sleep(0.01)
+  # Mid Low band boost (NRPN 3701h) +6dB
+  set_nrpn(port, channel, 0x37, 0x01, 0x40)
+  sleep(0.01)
+  
+  # 4. リバーブ設定 - Hall1で自然な響き
+  set_cc(port, channel, 0x69, 0x03)  # REV_TYPE = Hall1
+  sleep(0.01)
+  set_cc(port, channel, 0x25, 0x70)  # GMREV_SEND = 少し控えめ
+  sleep(0.01)
+  
+  # 5. コーラス設定 - 軽めに
+  set_cc(port, channel, 0x6A, 0x01)  # CHORUS_TYPE = Chorus1
+  sleep(0.01)
+  set_cc(port, channel, 0x26, 0x60)  # GMCHR_SEND = 控えめ
+  sleep(0.01)
+  
+  # 6. 不要なエフェクト無効
+  set_nrpn(port, channel, 0x37, 0x5F, 0x00)  # MIC/ECHO OFF
+  sleep(0.01)
+  
+  # 7. ボリューム調整
+  set_cc(port, channel, 7, 105)  # Channel Volume
+  sleep(0.01)
+end
 
 # MIDI送信関連
 midi_channel = 0 # チャンネル1 (0-15)
@@ -302,7 +436,7 @@ midi_channel = 0 # チャンネル1 (0-15)
 midi_velocity = 100 # ベロシティ (0-127)
 # last_midi_send_time = Time.now # Timeクラスは使えないので削除
 # midi_interval = 2 # 固定sleepにするので不要
-set_instrument(uart_port1, midi_channel, 0, VIOLIN_INSTRUMENT) # 初期楽器設定 (バイオリン)
+setup_realistic_violin(uart_port1, midi_channel) # 初期楽器設定 (リアルバイオリン)
 
 Display.set_text_size(2)
 
@@ -533,11 +667,11 @@ while true
             
             # 楽器を変更
             if violin_mode
-              set_instrument(uart_port1, midi_channel, 0, VIOLIN_INSTRUMENT)
+              setup_realistic_violin(uart_port1, midi_channel)
               Display.clear()
               Display.println("Violin Mode")
             else
-              set_instrument(uart_port1, midi_channel, 0, BASS_SUM_INSTRUMENT)
+              setup_realistic_slap_bass(uart_port1, midi_channel)
               Display.clear()
               Display.println("Bass Mode")
             end
@@ -784,9 +918,9 @@ while true
         
         # 弓の方向に応じて楽器を変更
         if newIsUping
-          set_instrument(uart_port1, midi_channel, 0, BASS_PULL_INSTRUMENT)
+          setup_realistic_slap_bass_pull(uart_port1, midi_channel)
         else
-          set_instrument(uart_port1, midi_channel, 0, BASS_SUM_INSTRUMENT)
+          setup_realistic_slap_bass(uart_port1, midi_channel)
         end
         
         # 新しいノートを鳴らす
