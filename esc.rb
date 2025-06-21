@@ -23,7 +23,7 @@ def print_hex(data, start_index = 0, length = nil)
   return "nil" if data.nil?
   return "empty" if data.empty?
 
-#   puts "not nil"
+#   # # puts "not nil"
   
   # 文字列の場合はbytes配列に変換
   byte_data = data.is_a?(String) ? data.bytes : data
@@ -51,44 +51,44 @@ if Display.available?
   line_count = 5
 else
   line_count = 0
-  puts "ディスプレイは利用できません"
+  # # puts "ディスプレイは利用できません"
 end
 
 # UARTポート1の初期化を追加
-puts "UART1(MIDI)を初期化します: ポート=#{uart_port1}, TX=#{tx_pin1}, RX=#{rx_pin1}, ボーレート=#{baud_rate1}, 8N1"
+# # puts "UART1(MIDI)を初期化します: ポート=#{uart_port1}, TX=#{tx_pin1}, RX=#{rx_pin1}, ボーレート=#{baud_rate1}, 8N1"
 # sleep(0.1)
 # MIDI標準の 8bit, Non-parity, 1 stop bit で初期化 (Arduinoコード参考)
 # rx_buffer_size をハードウェアFIFO長(128)より大きい値(例: 256)に変更
 if UART.init(uart_port1, tx_pin1, rx_pin1, baud_rate1, 256, 256, 1)
   LED.set([0x00, 0xFF, 0x00])
   Display.println("UART1(MIDI) init success (8N1)") # 設定情報を追加
-  puts "UART1(MIDI)初期化成功 (8N1)" # 設定情報を追加
+  # # puts "UART1(MIDI)初期化成功 (8N1)" # 設定情報を追加
   # sleep(0.3)
   LED.set([0, 0, 0])
 else
   LED.set([0xFF, 0x00, 0x00])
 
-  puts "UART1(MIDI)初期化失敗" # 表示を更新
+  # # puts "UART1(MIDI)初期化失敗" # 表示を更新
   Display.println("UART1(MIDI) init failed") # 表示を更新
   sleep(1)
   LED.set([0, 0, 0])
 end
 
 # UARTポート2の初期化を追加
-puts "UART2(USB)を初期化します: ポート=#{uart_port2}, TX=#{tx_pin2}, RX=#{rx_pin2}, ボーレート=#{baud_rate2}, 8N1"
+# # puts "UART2(USB)を初期化します: ポート=#{uart_port2}, TX=#{tx_pin2}, RX=#{rx_pin2}, ボーレート=#{baud_rate2}, 8N1"
 # sleep(0.1)
 # MIDI標準の 8bit, Non-parity, 1 stop bit で初期化 (Arduinoコード参考)
 # rx_buffer_size をハードウェアFIFO長(128)より大きい値(例: 256)に変更
 if UART.init(uart_port2, tx_pin2, rx_pin2, baud_rate2, 4096, 4096, 1)
   LED.set([0x00, 0xFF, 0x00])
   Display.println("UART2(USB) init success (8N1)") # 設定情報を追加
-  puts "UART2(USB)初期化成功 (8N1)" # 設定情報を追加
+  # # puts "UART2(USB)初期化成功 (8N1)" # 設定情報を追加
   # sleep(0.3)
   LED.set([0, 0, 0])
 else
   LED.set([0xFF, 0x00, 0x00])
 
-  puts "UART2(USB)初期化失敗" # 表示を更新
+  # # puts "UART2(USB)初期化失敗" # 表示を更新
   Display.println("UART2(USB) init failed") # 表示を更新
   sleep(1)
   LED.set([0, 0, 0])
@@ -159,7 +159,7 @@ TONE_DICT = {
 
 # MIDIメッセージ送信ヘルパー
 def send_midi_command(port, command_bytes)
-  # puts "Sending MIDI: #{command_bytes.map { |b| "0x#{b.to_s(16).upcase}" }.join(', ')}" # デバッグ用
+  # # # puts "Sending MIDI: #{command_bytes.map { |b| "0x#{b.to_s(16).upcase}" }.join(', ')}" # デバッグ用
   UART.write(port, command_bytes)
 end
 
@@ -338,6 +338,12 @@ def extract_packets(buffer)
         packet = buffer[0...16]
         buffer = buffer[16..-1] || ""
         packets << packet
+      elsif buffer.length >= 19
+        # 19バイトパケットの可能性をチェック（識別子不明なので長さベース）
+        # 一般的に FE + 識別子 + 17バイトのデータ形式と仮定
+        packet = buffer[0...19]
+        buffer = buffer[19..-1] || ""
+        packets << packet
       else
         # 不明なパケットタイプまたはデータ不足なので1バイト進める
         buffer = buffer[1..-1] || ""
@@ -349,7 +355,8 @@ def extract_packets(buffer)
   end
 
   # 残りのバッファと抽出されたパケットを返す
-#   puts packets
+#   # # puts packets
+  # # puts "buffer: #{print_hex(buffer.bytes)}"
   return packets, buffer
 end
 
@@ -393,9 +400,9 @@ Display.println("L287")
 while true
   # Display.println(i)
 
-  # puts i
+  # # # puts i
   benchMarkTime = Utils.millis()
-  # puts benchMarkTime - benchMark
+  # # # puts benchMarkTime - benchMark
   benchMark = benchMarkTime
   currentTimeStamp = Utils.millis()
   # Display.println("L294")
@@ -410,9 +417,10 @@ while true
   available_bytes = UART.available(uart_port2)
   # available_bytes = 0
   if available_bytes > 0
-    puts "available_bytes: #{available_bytes}"
+    # # puts "available_bytes: #{available_bytes}"
     # 新しいデータを読み取り、バッファに追加
     new_data = UART.read(uart_port2, available_bytes)
+    # # puts "Raw received data: #{print_hex(new_data.bytes)}"
     uart2_buffer += new_data
 
     # バッファからパケットを抽出
@@ -420,22 +428,22 @@ while true
 
     # 抽出したパケットを処理
     packets.each do |packet|
-        puts "pct"
-# パケットをHEXでputsする
-        puts "packet: #{print_hex(packet.bytes)}"
+        # # puts "pct"
+# パケットをHEXで# # putsする
+        # # puts "packet: #{print_hex(packet.bytes)}"
       # パケットの処理
       if packet.bytes[0] == 0xFE
-        puts "=== Complete Packet ==="
-        puts "Raw: #{print_hex(packet.bytes)}"
-        puts "Length: #{packet.length} bytes"
-        puts "Type: 0x#{packet.bytes[1].to_s(16).upcase}" if packet.length > 1
+        # # puts "=== Complete Packet ==="
+        # # puts "Raw: #{print_hex(packet.bytes)}"
+        # # puts "Length: #{packet.length} bytes"
+        # # puts "Type: 0x#{packet.bytes[1].to_s(16).upcase}" if packet.length > 1
 
         packet_type = packet.bytes[1]
         if packet_type == 0x04 && packet.length == 16
           # 16バイトパケットの処理 (弓の方向 + マウスホイール)
-          puts "--- FE 04 Packet (16 bytes) ---"
-          puts "Bow direction (byte 14): 0x#{packet.bytes[PACKET_BOW_DIRECTION_INDEX].to_s(16).upcase}"
-          puts "Mouse wheel (byte 11): 0x#{packet.bytes[PACKET_MOUSE_WHEEL_INDEX].to_s(16).upcase}"
+          # # puts "--- FE 04 Packet (16 bytes) ---"
+          # # puts "Bow direction (byte 14): 0x#{packet.bytes[PACKET_BOW_DIRECTION_INDEX].to_s(16).upcase}"
+          # # puts "Mouse wheel (byte 11): 0x#{packet.bytes[PACKET_MOUSE_WHEEL_INDEX].to_s(16).upcase}"
           
           # マウスホイール押し離し判定（11バイト目）
           current_wheel_value = packet.bytes[PACKET_MOUSE_WHEEL_INDEX]
@@ -443,7 +451,7 @@ while true
             # マウスホイール状態が変化した
             # 4ビット目（0x08）が1なら押されている、0なら離されている
             newIsWheelPressed = ((current_wheel_value & 0x04) != 0)
-            # puts "Mouse wheel: #{current_wheel_value.to_s(16)} -> #{newIsWheelPressed ? 'Pressed' : 'Released'}"
+            # # # puts "Mouse wheel: #{current_wheel_value.to_s(16)} -> #{newIsWheelPressed ? 'Pressed' : 'Released'}"
             lastWheelValue = current_wheel_value
             wheelStateChanged = true
           end
@@ -480,11 +488,11 @@ while true
           # 20バイトパケットの処理 (キー入力)
           bowTimeStamp = newBowTimeStamp
 
-          puts "--- FE 08 Packet (20 bytes) ---"
-          puts "Bytes 0-7:   #{print_hex(packet.bytes, 0, 8)}"
-          puts "Bytes 8-15:  #{print_hex(packet.bytes, 8, 8)}"
-          puts "Bytes 16-19: #{print_hex(packet.bytes, 16, 4)}"
-          puts "Key area (12-15): #{print_hex(packet.bytes, 12, 4)}"
+          # # puts "--- FE 08 Packet (20 bytes) ---"
+          # # puts "Bytes 0-7:   #{print_hex(packet.bytes, 0, 8)}"
+          # # puts "Bytes 8-15:  #{print_hex(packet.bytes, 8, 8)}"
+          # # puts "Bytes 16-19: #{print_hex(packet.bytes, 16, 4)}"
+          # # puts "Key area (12-15): #{print_hex(packet.bytes, 12, 4)}"
 
           # 13-16バイト目（インデックス12-15）を取得
           current_values = []
@@ -547,7 +555,7 @@ while true
           #     if note
           #       set_note_on(uart_port1, midi_channel, note, midi_velocity)
           #       current_playing_note = note
-          #       puts "単音演奏: Key=0x#{key_code.to_s(16)} Note=#{note}"
+          #       # # puts "単音演奏: Key=0x#{key_code.to_s(16)} Note=#{note}"
           #     end
           #   end
           # end
@@ -555,13 +563,64 @@ while true
 
           # デバッグ用のスタック表示
           if !packet_stack.empty?
-            # puts "Stack size: #{packet_stack.size}"
+            # # # puts "Stack size: #{packet_stack.size}"
             # puts "内容: #{packet_stack.map { |v| sprintf("0x%02X", v) }.join(" ")}"
           end
+        elsif packet.length == 19
+          # 19バイトパケットの処理（弓の方向判定 + マウスホイール押し込み判定）
+          # puts "--- 19 Byte Packet ---"
+          # puts "Type: 0x#{packet_type.to_s(16).upcase}"
+          # puts "Bytes 0-7:   #{print_hex(packet.bytes, 0, 8)}"
+          # puts "Bytes 8-15:  #{print_hex(packet.bytes, 8, 8)}"
+          # puts "Bytes 16-18: #{print_hex(packet.bytes, 16, 3)}"
+          # puts "Full packet: #{print_hex(packet.bytes)}"
+          
+          # マウスホイール押し込み判定（13バイト目、後ろから6番目）
+          wheel_value_19 = packet.bytes[12]
+          # puts "Wheel value (byte 13): 0x#{wheel_value_19.to_s(16).upcase}"
+          if wheel_value_19 == 0x04
+            if !newIsWheelPressed  # 状態が変化した時のみ更新
+              newIsWheelPressed = true
+              wheelStateChanged = true
+              # puts "Wheel pressed (19-byte packet)"
+            end
+          else
+            if newIsWheelPressed  # 状態が変化した時のみ更新
+              newIsWheelPressed = false
+              wheelStateChanged = true
+              # puts "Wheel released (19-byte packet)"
+            end
+          end
+          
+          # 14バイト目で弓の方向判定
+          bow_direction = packet.bytes[16]
+          # puts "Bow direction (byte 16): 0x#{bow_direction.to_s(16).upcase}"
+          
+          if bow_direction == 0xFF
+            # FFの時はupbow
+            newBowTimeStamp = Utils.millis()
+            delta = newBowTimeStamp - prevBowTimeStamp
+            prevBowTimeStamp = newBowTimeStamp
+            bowSpeed = delta > 0 ? (1000.0 / delta) : 0.0
+            newIsUping = true
+            bowTimeStamp = newBowTimeStamp
+            # puts "Upbow detected (FF)"
+          elsif bow_direction == 0x01
+            # 01の時はdownbow
+            newBowTimeStamp = Utils.millis()
+            delta = newBowTimeStamp - prevBowTimeStamp
+            prevBowTimeStamp = newBowTimeStamp
+            bowSpeed = delta > 0 ? (1000.0 / delta) : 0.0
+            newIsUping = false
+            bowTimeStamp = newBowTimeStamp
+            # puts "Downbow detected (01)"
+          end
+          changeDisp = true if newIsUping != isUping
+          changeDisp = true if wheelStateChanged
         else
-          puts "--- Unknown Packet ---"
-          puts "Type: 0x#{packet_type.to_s(16).upcase}, Length: #{packet.length}"
-          puts "Data: #{print_hex(packet.bytes, 0, [packet.length, 16].min)}" # 最大16バイトまで表示
+          # # puts "--- Unknown Packet ---"
+          # # puts "Type: 0x#{packet_type.to_s(16).upcase}, Length: #{packet.length}"
+          # # puts "Data: #{print_hex(packet.bytes, 0, [packet.length, 16].min)}" # 最大16バイトまで表示
         end
       else
         # 無視する（何も処理しない）
@@ -573,7 +632,7 @@ while true
 
     # バッファが大きくなりすぎたらクリア（異常状態防止）
     if uart2_buffer.length > 1024
-      puts "Buffer overflow, clearing"
+      # puts "Buffer overflow, clearing"
       uart2_buffer = ""
     end
   end
@@ -614,7 +673,7 @@ while true
     # まず現在鳴っている音を止める
     if current_playing_note
       set_note_off(uart_port1, midi_channel, current_playing_note)
-      # puts "Note OFF: #{current_playing_note}" if current_playing_note # デバッグ用
+      # # # puts "Note OFF: #{current_playing_note}" if current_playing_note # デバッグ用
     end
 
     # 新しい音を鳴らす (target_noteがnilでなければ)
@@ -623,13 +682,13 @@ while true
       # 新しいノートオンと同時に、現在のisWheelPressed状態に基づいてモジュレーションを設定
       if isWheelPressed
         set_modulation(uart_port1, midi_channel, 127)
-        # puts "Vibrato ON (new note, wheel IS pressed)"
+        # # # puts "Vibrato ON (new note, wheel IS pressed)"
       else
         # ホイールが押されていなければ、新しいノートではビブラートOFF
         set_modulation(uart_port1, midi_channel, 0)
-        # puts "Vibrato OFF (new note, wheel NOT pressed)"
+        # # # puts "Vibrato OFF (new note, wheel NOT pressed)"
       end
-      # puts "Note ON: #{target_note} (Key: 0x#{packet_stack.last.to_s(16)})" # デバッグ用
+      # # # puts "Note ON: #{target_note} (Key: 0x#{packet_stack.last.to_s(16)})" # デバッグ用
     end
 
     # 現在鳴っている音を更新
@@ -642,11 +701,11 @@ while true
   #   if isWheelPressed
   #     # 強めのビブラート（モジュレーション最大値）
   #     set_modulation(uart_port1, midi_channel, 127)
-  #     # puts "Vibrato ON (強め)" # デバッグ用
+  #     # # # puts "Vibrato ON (強め)" # デバッグ用
   #   else
   #     # ビブラートオフ
   #     set_modulation(uart_port1, midi_channel, 0)
-  #     # puts "Vibrato OFF" # デバッグ用
+  #     # # # puts "Vibrato OFF" # デバッグ用
   #   end
   # end
   
@@ -680,19 +739,19 @@ while true
 
   # Blinkリロード要求をチェック
   if Blink.req_reload?
-    puts "リロード要求を検出"
+    # # puts "リロード要求を検出"
     # 終了前に全てのノートをオフにする (音が鳴りっぱなしになるのを防ぐ)
-    TONE_DICT.each do |key_code, note|
+    TONE_DICT.each do |key_code, note| 
       set_note_off(uart_port1, midi_channel, note)
     end
     UART.deinit(uart_port1)
     UART.deinit(uart_port2)
-    break
+    break   
   end
 end
 
 # 終了処理
-puts "UARTを終了します"
+# puts "UARTを終了します"
 # 念のためここでも全ノートオフ
 TONE_DICT.each do |key_code, note|
   set_note_off(uart_port1, midi_channel, note)
