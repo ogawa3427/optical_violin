@@ -477,8 +477,11 @@ def get_note_name(note_number)
   return "#{octave}#{NOTE_NAMES[note_index]}"
 end
 
+# 表示状態の管理用変数に弓速度表示用の変数を追加
+$last_bow_speed = -1.0
+
 # バイオリンモード用のビジュアル表示を更新する関数
-def update_violin_display(is_playing, is_upbow, note_number, wheel_pressed)
+def update_violin_display(is_playing, is_upbow, note_number, wheel_pressed, bow_speed)
   return unless Display.available?
   
   # 演奏状態判定（弓が動いていて音が出ている状態）
@@ -497,14 +500,14 @@ def update_violin_display(is_playing, is_upbow, note_number, wheel_pressed)
     $last_go_sign = go_sign
   end
   
-  # 音名の表示（中央上部）
+  # 音名の表示（上部）
   note_name = get_note_name(note_number)
   if note_name != $last_note_name
     # 背景色を決定
     fill_color = note_name != "NA" ? COLOR_YELLOW : COLOR_DARKGREY
     
-    # 中央部分をクリア（左右の枠線は避ける）
-    Display.fill_rect($display_width / 16, 0, $display_width * 14 / 16, $display_height * 2 / 3, fill_color)
+    # 上部をクリア（左右の枠線は避ける）
+    Display.fill_rect($display_width / 16, 0, $display_width * 14 / 16, $display_height / 3, fill_color)
     
     # 音名を中央に表示
     Display.set_text_size(3)
@@ -512,11 +515,33 @@ def update_violin_display(is_playing, is_upbow, note_number, wheel_pressed)
     # テキストを中央に配置（フォントサイズ3では1文字約18ピクセル幅として計算）
     text_width = note_name.length * 18
     x_pos = ($display_width - text_width) / 2
-    y_pos = $display_height / 8
+    y_pos = $display_height / 12
     Display.set_cursor(x_pos, y_pos)
     Display.print(note_name)
     
     $last_note_name = note_name
+  end
+  
+  # 弓速度の表示（中央部）
+  if (bow_speed - $last_bow_speed).abs > 0.1 || $last_bow_speed < 0  # 0.1以上の差があるか初回表示の場合
+    # 背景色を決定
+    fill_color = is_playing ? COLOR_WHITE : COLOR_DARKGREY
+    
+    # 中央部をクリア（左右の枠線は避ける）
+    Display.fill_rect($display_width / 16, $display_height / 3, $display_width * 14 / 16, $display_height / 3, fill_color)
+    
+    # 弓速度を表示
+    speed_text = sprintf("%.1f", bow_speed)
+    Display.set_text_size(2)
+    Display.set_text_color(COLOR_BLACK)
+    # テキストを中央に配置（フォントサイズ2では1文字約12ピクセル幅として計算）
+    text_width = speed_text.length * 12
+    x_pos = ($display_width - text_width) / 2
+    y_pos = $display_height / 3 + 10
+    Display.set_cursor(x_pos, y_pos)
+    Display.print(speed_text)
+    
+    $last_bow_speed = bow_speed
   end
   
   # 弓の方向表示（下部）
@@ -653,7 +678,7 @@ bass_bow_interval_threshold = 100  # ボウストロークの間隔閾値（ミ�
 if Display.available?
   Display.clear()
   # 初期状態でビジュアル表示を設定（バイオリンモード）
-  update_violin_display(false, false, nil, false)
+  update_violin_display(false, false, nil, false, 0.0)
 end
 
 # メインループ
@@ -783,7 +808,7 @@ while true
               if Display.available?
                 Display.clear()
                 # バイオリンモードのビジュアル表示を初期化
-                update_violin_display(false, false, nil, false)
+                update_violin_display(false, false, nil, false, 0.0)
               end
             else
               setup_realistic_slap_bass(uart_port1, midi_channel)
@@ -952,7 +977,7 @@ while true
 
   # バイオリンモードのビジュアル表示を更新
   if violin_mode
-    update_violin_display(isBowing, isUping, current_playing_note, isWheelPressed)
+    update_violin_display(isBowing, isUping, current_playing_note, isWheelPressed, bowSpeed)
   else
     # ベースモードの場合は従来の表示を維持（必要に応じて後で更新）
     if changeDisp
