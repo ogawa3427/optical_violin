@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"name": "UART_show",
+			"path": ".."
+		}
+	],
+	"settings": {}
+}
