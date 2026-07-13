@@ -1,0 +1,18 @@
+# export_for_mcu.py の実行に必要な Python 依存。
+#   セットアップ: python -m pip install -r tools/requirements.txt
+#   生成:        python tools/export_for_mcu.py   (python = pyenv 3.12.2)
+#
+# scikit-learn は学習済みモデルの pickle 保存時バージョンに固定すること。
+# ズレると InconsistentVersionWarning が出てパリティが保証されない。
+scikit-learn==1.8.0
+
+# 数値計算 / データ
+numpy==2.3.4
+scipy==1.17.1
+pandas==2.3.3
+joblib==1.5.3
+
+# 音声 / 可視化 (realData/myScripts の import 連鎖で必要)
+soundfile==0.14.0
+librosa==0.11.0
+matplotlib==3.11.0

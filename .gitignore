@@ -1,0 +1,18 @@
+# PlatformIO ビルド成果物・依存ライブラリ (自動生成)
+.pio/
+*.o
+*.elf
+*.bin
+*.map
+
+# PlatformIO 自動生成の VSCode 設定 (マシン固有の絶対パスを含むため除外)
+.vscode/
+
+# macOS
+.DS_Store
+
+# Python (tools/)
+__pycache__/
+*.pyc
+.venv/
+venv/
