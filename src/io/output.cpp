@@ -38,7 +38,11 @@ void Output::sendMidi3(uint8_t status, uint8_t d1, uint8_t d2) {
 #endif
 
 void Output::noteOn(int note_num, int velocity) {
-  Serial.printf("NOTE_ON %d v%d\n", note_num, velocity); // PC 側デバッグログ (CDC)
+#ifndef M62_LIVE_HID
+  // PC 側デバッグログ (CDC)。ライブモードでは telemetry (Core 0) が N 行を出すため
+  // ここで print しない — Core 1 から書くと Core 0 の CSV 行と混線する。
+  Serial.printf("NOTE_ON %d v%d\n", note_num, velocity);
+#endif
 #ifdef M62_OUTPUT_MIDI
   cur_ch_ ^= 1;                         // ch0/ch1 をノートごとにトグル (デカップリング)
   uint8_t ch = (uint8_t)cur_ch_;
@@ -53,8 +57,11 @@ void Output::noteOff(int note_num, const char* cause) {
   // 原因別カウンタを更新 (デバッグ出力で「何回距離切れ/Δ比切れか」を見るため)
   if (std::strcmp(cause, "distance") == 0) noteoff_dist_++;
   else if (std::strcmp(cause, "delta") == 0) noteoff_delta_++;
+#ifndef M62_LIVE_HID
+  // noteOn と同じ理由でライブモードでは print しない (N 行が代替)
   Serial.printf("NOTE_OFF %d cause=%s dist=%d delta=%d\n",
                 note_num, cause, noteoff_dist_, noteoff_delta_);
+#endif
 #ifdef M62_OUTPUT_MIDI
   int n = note_num & 0x7F;
   // 2 ch 両方を探して off にする (どちらに残っているか分からないため)

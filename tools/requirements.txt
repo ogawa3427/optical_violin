@@ -12,6 +12,13 @@ scipy==1.17.1
 pandas==2.3.3
 joblib==1.5.3
 
+# watch_telemetry.py (実機テレメトリのライブ監視) 用。--analyze は標準ライブラリのみ
+pyserial==3.5
+
+# causal_engine.py / live_scope.py (テレメトリの因果再現+可視化) は
+# numpy + matplotlib + (ライブ監視時のみ) pyserial だけで動く。
+# scikit-learn/dataAnalysis 非依存 (models_62.json の焼き込みテーブルを直読み)。
+
 # 音声 / 可視化 (realData/myScripts の import 連鎖で必要)
 soundfile==0.14.0
 librosa==0.11.0

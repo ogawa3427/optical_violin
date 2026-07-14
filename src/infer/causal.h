@@ -31,7 +31,8 @@ class CausalEngine {
   std::function<void(int note_num)> onNoteOn;
   std::function<void(int note_num, NoteOffReason reason)> onNoteOff;
   // expr は [0,127] の連続値。MIDI 送出時は呼び出し側で四捨五入する。
-  std::function<void(int note_idx, float t_ms, float expr)> onExpr;
+  // i_a は走査中の思念スコア (trailing LPF 済み)。オンセットの expr=0 送出時は NAN。
+  std::function<void(int note_idx, float t_ms, float expr, float i_a)> onExpr;
 
   // m_event を 1 個投入 (preprocess 済み: device_ms, m, note_num)。
   void push(int device_ms, int m, int note_num) {
@@ -65,12 +66,28 @@ class CausalEngine {
 
   // ライブ時に毎ループ呼ぶ。最後のパルスから Δ[k]*DELTA_RATIO_CUT を超えて
   // 無音が続いたら、次パルスを待たずに無音中で音を切る (本来の Δ比カット)。
+  //
+  // d_ref は「末尾 1 個」ではなく「末尾 3 個の最大」を使う (実機のみの堅牢化)。
+  // エンコーダの二重パルス (Δt=2〜3ms) が末尾に入ると、末尾 1 個基準では
+  // タイムアウトが 2×2ms=4ms に崩壊し、次の正常パルス (10〜20ms 後) を待てずに
+  // 音が切れる (2026-07-13 実測)。末尾 3 個の max なら単発の極小 Δt を無視して
+  // 直近の正常間隔を基準にでき、正常時は 3 個ともほぼ同値なので挙動は変わらない。
+  // 注: tick() はライブ専用で Python 因果リファレンスに対応物がなく、parity 非拘束。
+  //
+  // ギャップの基準は last_uoff_ (ユニーク offset) ではなく last_alloff_ (全パルス) を使う。
+  // last_uoff_ は KRR 窓内 (offset <= WINDOW_MS) でしか更新されないため、ノートが
+  // 1 秒を超えると凍結し、弾いている最中でも「無音ギャップ」が増え続けて
+  // WINDOW_MS + 2Δt ≈ 1.02〜1.04 秒で必ず切られていた (2026-07-13 実測 14 件)。
+  // last_alloff_ は feed() で毎パルス無条件更新されるので窓の外でも正しく追従する。
   void tick(uint32_t now_ms) {
-    if (!in_note_ || !has_uoff_ || deltas_.empty() || DELTA_RATIO_CUT <= 0.0f) return;
-    float d_ref = deltas_.back();                     // 直近の確定間隔 Δ[k]
+    if (!in_note_ || !has_alloff_ || deltas_.empty() || DELTA_RATIO_CUT <= 0.0f) return;
+    size_t n = deltas_.size();
+    float d_ref = 0.0f;                               // 末尾 min(3,n) 個の最大 Δt
+    for (size_t i = n - std::min<size_t>(3, n); i < n; ++i)
+      d_ref = std::max(d_ref, deltas_[i]);
     if (d_ref <= 0.0f) return;
-    // 「最終ユニーク offset の絶対時刻」= ノート開始時刻 + 最後の相対 offset
-    long last_abs = (long)start_ms_ + (long)last_uoff_;
+    // 「最終パルスの絶対時刻」= ノート開始時刻 + 最後の相対 offset (窓制限なし)
+    long last_abs = (long)start_ms_ + (long)last_alloff_;
     long gap = (long)now_ms - last_abs;               // 現在時刻との無音ギャップ
     // ギャップが Δ[k]*RATIO を超えたらノートを終了
     if ((float)gap > DELTA_RATIO_CUT * d_ref)
@@ -117,7 +134,8 @@ class CausalEngine {
 
     // オンセットで expr CC=0 を送出 (noteOn 後 = 新ノートの ch)。
     // 前ノートのリリースは自然減衰させ、新ノートはこの ch を 0 からクリーンスタートさせる。
-    if (onExpr) onExpr(note_idx_, 0.0f, 0.0f);
+    // i_a は未確定なので NAN (LCD の iA 累積には載せない)。
+    if (onExpr) onExpr(note_idx_, 0.0f, 0.0f, NAN);
 
     (void)feed(e);  // 先頭パルスも feed に通す (Δt 比カット判定は先頭なので必ず false)
   }
@@ -226,8 +244,8 @@ class CausalEngine {
       out = std::isfinite(base_db) ? base_db : db_atk;
     }
 
-    // dB → CC#11 [0,127] に変換してコールバック
-    if (onExpr) onExpr(note_idx_, t, db_to_expr_one(out));
+    // dB → CC#11 [0,127] に変換してコールバック (i_now も LCD/テレメトリ用に同梱)
+    if (onExpr) onExpr(note_idx_, t, db_to_expr_one(out), i_now);
     return false; // カット要求なし
   }
 };

@@ -412,16 +412,27 @@ static void note_to_obs(const Note& note, std::vector<int>& offs_win,
 // pred = Σ_i α[k][i] · exp(-γ[k] · Σ_{j<=k} ((obs[j]-X[i][j])/scale[k][j])²)
 // StandardScaler の mean はカーネル距離で相殺されるためテーブルに持たない。
 static float score_at_k(const std::vector<float>& obs, int k) {
+  // 内側ループの FP 除算は ESP32-S3 では乗算より大幅に遅いため、1/KRR_SCALE を
+  // 初回呼び出し時に前計算して乗算に置き換える (5460 float ≈ 21.8KB、RAM 常駐)。
+  // 丸めが除算と僅かに変わるが parity ゲート (max abs expr err <= 1.0) 内で検証済み。
+  static const std::vector<float> inv_scale = [] {
+    constexpr size_t n = sizeof(KRR_SCALE) / sizeof(KRR_SCALE[0]);
+    std::vector<float> v(n);
+    for (size_t i = 0; i < n; ++i) v[i] = 1.0f / KRR_SCALE[i];
+    return v;
+  }();
+
   int off = KRR_OFFSET[k];              // k 番目プレフィックスのスケールテーブル先頭オフセット
   int len = k + 1;                      // prefix k の特徴次元数 (三角バンク)
   float gamma = KRR_GAMMA[k];          // RBF カーネルの γ
   const float* alpha = &KRR_ALPHA[(size_t)k * KRR_N_TRAIN]; // k 番目の双対係数ベクトル
+  const float* inv = &inv_scale[off];   // この prefix のスケール逆数
   float acc = 0.0f;                     // 予測値の累積
   for (int i = 0; i < KRR_N_TRAIN; ++i) {
     const float* xi = &KRR_X[(size_t)i * T_CAP]; // i 番目訓練サンプル (T_CAP 次元)
     float d2 = 0.0f;                    // スケール正規化後の二乗距離
     for (int j = 0; j < len; ++j) {
-      float z = (obs[j] - xi[j]) / KRR_SCALE[off + j]; // StandardScaler 正規化
+      float z = (obs[j] - xi[j]) * inv[j]; // StandardScaler 正規化 (逆数乗算)
       d2 += z * z;                      // 次元 j の寄与を加算
     }
     acc += alpha[i] * std::exp(-gamma * d2); // RBF カーネル × 双対係数

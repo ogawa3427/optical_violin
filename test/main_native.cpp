@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
     // 因果版: 1 パルス 1 expr。CausalEngine をそのまま使う (実機と同一コード)。
     int npts = 0;
     m62::CausalEngine eng;
-    eng.onExpr = [&](int ni, float t, float expr) {
+    eng.onExpr = [&](int ni, float t, float expr, float /*i_a*/) {
       std::printf("%d,%.6f,%.6f\n", ni, t, expr);
       npts++;
     };

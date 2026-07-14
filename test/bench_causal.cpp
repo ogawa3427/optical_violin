@@ -22,7 +22,7 @@ int main() {
   const int REPEAT = 200;            // ノート列を何回流すか (統計安定化)
   for (int r = 0; r < REPEAT; ++r) {
     m62::CausalEngine eng;
-    eng.onExpr = [&](int, float, float){ emitted++; };  // 出力はカウントのみ
+    eng.onExpr = [&](int, float, float, float){ emitted++; };  // 出力はカウントのみ
     for (int i = 0; i < m62_sample::N; ++i) {
       const auto& e = m62_sample::EVENTS[i];
       auto t0 = clk::now();
