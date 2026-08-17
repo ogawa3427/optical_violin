@@ -34,6 +34,17 @@ class CausalEngine {
   // i_a は走査中の思念スコア (trailing LPF 済み)。オンセットの expr=0 送出時は NAN。
   std::function<void(int note_idx, float t_ms, float expr, float i_a)> onExpr;
 
+  // ---- 演奏中の外部乗っ取り (BtnA モード切替から main.cpp が設定する) ----
+  // override_i : 思念スコア i(t) を i_ext [-1,1] で置換 (joystick X 軸)。
+  //   i_now は t_end/アタック/ベース dB 全段の入力なので、これ 1 つで演奏全体が乗っ取られる。
+  // override_pct: 音量パーセンタイルを pct_ext [0,1] で置換 (fader)。
+  //   サステインの pct (base_db 経路) とアタックの p_atk (dev 経路) の両方を差し替える
+  //   ので、アタック区間・サステイン区間ともに fader が音量を握る。
+  bool  override_i   = false;
+  float i_ext        = 0.0f;
+  bool  override_pct = false;
+  float pct_ext      = 0.0f;
+
   // m_event を 1 個投入 (preprocess 済み: device_ms, m, note_num)。
   void push(int device_ms, int m, int note_num) {
     (void)m;                                          // m は将来の弓向きフィルタ用に温存
@@ -207,6 +218,7 @@ class CausalEngine {
     // ---- 各テーブルを「走査中の i(t)」で引く ----
     // trailing LPF で平滑した現時点の思念スコア (バッチ版の i_tend とは別物)
     float i_now = trailing(raw_i_, LPF_I_WIN);
+    if (override_i) i_now = clampf(i_ext, -1.0f, 1.0f); // joystick X で iA を乗っ取り
     float t = offset;                                 // 現在のノート内時刻 [ms]
     float t_end = t_end_for_i(i_now);                // 現時点の i から推定する仮アタック終端
 
@@ -217,11 +229,13 @@ class CausalEngine {
     // --- 全域ベース dB (サステイン領域で使う) ---
     // 弓速 → パーセンタイル (隣接2ノードブレンド) → dB (pooled CDF)
     float pct = std::isfinite(speed_now) ? atk_bow_percentile_i(i_now, t, speed_now) : NAN;
+    if (override_pct) pct = clampf(pct_ext, 0.0f, 1.0f); // fader で音量パーセンタイルを乗っ取り
     float base_db = std::isfinite(pct) ? percentile_to_db_i(pct, i_now) : NAN;
 
     // --- アタック瞬時 dB = softplus 形状 + 弓速偏差 (2026-07-10: 乗算fac→加算devに統一) ---
     float db_raw = atk_softplus_db_i(t, i_now);      // softplus 形状 (i 軸補間)
     float p_atk = std::isfinite(speed_atk) ? atk_bow_percentile_i(i_now, t, speed_atk) : NAN;
+    if (override_pct) p_atk = clampf(pct_ext, 0.0f, 1.0f); // fader をアタック区間にも効かせる
     float dev = atk_dev(p_atk, i_now, t);            // (i,t) 音量グリッド由来の加算オフセット
     db_atk_hist_.push_back(db_raw + dev);            // 瞬時アタック dB を履歴に追加
     float db_atk = trailing(db_atk_hist_, ATK_SMOOTH_WIN); // trailing LPF で平滑化

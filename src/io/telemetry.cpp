@@ -10,6 +10,9 @@ namespace m62io {
 // ---- Core1/Core0 間の共有物 (単一キューと drop カウンタのみ) ----
 static QueueHandle_t s_q = nullptr;          // TelemetryRecord (P/N 混載・発生順)
 static volatile uint32_t s_pulse_drops = 0;  // キュー満杯で捨てたレコード数
+static volatile uint8_t  s_mode  = 0;        // 乗っ取りモード (0=なし 1=iA 2=p 3=iA+p)
+static volatile float    s_i_ext = 0.0f;     // joystick 由来の現在 iA (override_i 表示用)
+static volatile float    s_pct_ext = 0.0f;   // fader 由来の現在 p [0,1] (override_pct 表示用)
 
 // ---- Core 0 専用の統計 (タスク以外から触らない) ----
 struct State {
@@ -87,6 +90,12 @@ void Telemetry::pushNote(const NoteRecord& r) {
   if (!s_q || xQueueSend(s_q, &tr, 0) != pdTRUE) ++s_pulse_drops;
 }
 
+void Telemetry::setStatus(uint8_t mode, float i_ext, float pct_ext) {
+  s_mode    = mode;
+  s_i_ext   = i_ext;
+  s_pct_ext = pct_ext;
+}
+
 void Telemetry::taskEntry(void* self) {
   static_cast<Telemetry*>(self)->taskLoop();
 }
@@ -103,6 +112,8 @@ void Telemetry::taskLoop() {
     TelemetryRecord tr;
     while (xQueueReceive(s_q, &tr, 0) == pdTRUE) {
       int n = 0;
+      // USB リプレイ由来 (emit_csv=false) は CSV を出さない。LCD 統計は下で更新する。
+      const bool emit_csv = (tr.kind == 'P') ? tr.pulse.emit_csv : tr.note.emit_csv;
       if (tr.kind == 'P') {
         const PulseRecord& p = tr.pulse;
         ++s_st.pulse_count;
@@ -149,8 +160,9 @@ void Telemetry::taskLoop() {
                      nr.note_num, nr.cause, (unsigned long)nr.device_ms);
 #endif
       }
-      // CDC バッファに空きがある時だけ書く (PC が読んでなくてもブロックしない)
-      if (n > 0 && Serial.availableForWrite() >= n)
+      // CDC バッファに空きがある時だけ書く (PC が読んでなくてもブロックしない)。
+      // emit_csv=false (USB リプレイ由来) はここを飛ばす = CSV 抑止。
+      if (emit_csv && n > 0 && Serial.availableForWrite() >= n)
         Serial.write((uint8_t*)line, n);
     }
     // 2) LCD は 100ms 周期 (10fps) で再描画
@@ -200,18 +212,33 @@ void Telemetry::draw() {
     canvas.print("DN");
   }
 
-  // ========== 2段目: expr メーター [0,127] ==========
-  canvas.drawRect(2, 24, 124, 12, TFT_DARKGREY);
-  int w = (int)s_st.last_cc11 * 122 / 127;
-  if (w > 0) canvas.fillRect(3, 25, w, 10, TFT_CYAN);
+  const bool ov_i   = (s_mode == 1 || s_mode == 3);
+  const bool ov_pct = (s_mode == 2 || s_mode == 3);
+
+  // ========== 2段目-上: p バー (fader パーセンタイル [0,1]) ==========
+  // 乗っ取り中 (ov_pct) のみ fader 値を塗る。非乗っ取り時は枠だけ (暗)。
+  canvas.drawRect(2, 22, 124, 9, TFT_DARKGREY);
+  if (ov_pct) {
+    float p = s_pct_ext < 0 ? 0 : (s_pct_ext > 1 ? 1 : s_pct_ext);
+    int pw = (int)(p * 122.0f + 0.5f);
+    if (pw > 0) canvas.fillRect(3, 23, pw, 7, TFT_ORANGE);
+  }
   canvas.setTextSize(1);
+  canvas.setTextColor(ov_pct ? TFT_WHITE : TFT_DARKGREY);
+  canvas.setCursor(4, 23);
+  canvas.print("p");
+
+  // ========== 2段目-下: expr メーター [0,127] (少し大きく) ==========
+  canvas.drawRect(2, 33, 124, 15, TFT_DARKGREY);
+  int w = (int)s_st.last_cc11 * 122 / 127;
+  if (w > 0) canvas.fillRect(3, 34, w, 13, TFT_CYAN);
   canvas.setTextColor(TFT_WHITE);
-  canvas.setCursor(4, 26);
+  canvas.setCursor(4, 37);
   canvas.printf("%3u", s_st.last_cc11);
 
   // ========== 3段目: iA 累積 (左=-1 … 右=+1) ==========
-  constexpr int kIaY = 40;
-  constexpr int kIaH = 42;
+  constexpr int kIaY = 50;
+  constexpr int kIaH = 34;
   canvas.drawRect(0, kIaY, 128, kIaH, TFT_DARKGREY);
   // 中央 (i=0) ガイド
   canvas.drawFastVLine(64, kIaY + 1, kIaH - 2, canvas.color565(40, 40, 40));
@@ -219,6 +246,16 @@ void Telemetry::draw() {
     uint8_t h = s_st.ia_hits[x];
     if (h == 0) continue;
     canvas.drawFastVLine(x, kIaY + 1, kIaH - 2, iaColor(h));
+  }
+  // 乗っ取り中 (ov_i) はジョイスティックの現在 iA を明るいマーカー(3px)で重畳
+  if (ov_i) {
+    float iv = s_i_ext < -1 ? -1 : (s_i_ext > 1 ? 1 : s_i_ext);
+    int mx = (int)((iv + 1.0f) * 0.5f * 127.0f + 0.5f);
+    if (mx < 0) mx = 0; if (mx > 127) mx = 127;
+    uint16_t mc = canvas.color565(255, 80, 200);
+    canvas.drawFastVLine(mx, kIaY + 1, kIaH - 2, mc);
+    if (mx > 0)   canvas.drawFastVLine(mx - 1, kIaY + 1, kIaH - 2, mc);
+    if (mx < 127) canvas.drawFastVLine(mx + 1, kIaY + 1, kIaH - 2, mc);
   }
   canvas.setTextSize(1);
   canvas.setTextColor(TFT_LIGHTGREY);
@@ -235,15 +272,35 @@ void Telemetry::draw() {
   canvas.printf("p %lu  n %lu", (unsigned long)s_st.pulse_count,
                 (unsigned long)s_st.note_count);
 
-  // ========== 5段目: end reason (size2) ==========
-  canvas.setTextSize(2);
+  // 乗っ取りモードタグ (右下・右寄せ): モードごとに色を変える。
+  //   1=iA → マゼンタ (iA マーカーと同色) / 2=p → オレンジ (p バーと同色) / 3=iA+p → 緑
+  {
+    const uint8_t md = s_mode & 3;
+    static const char* kTag[4] = {"--", "iA", "p", "iA+p"};
+    uint16_t tc;
+    switch (md) {
+      case 1:  tc = canvas.color565(255, 80, 200); break;  // マゼンタ
+      case 2:  tc = TFT_ORANGE;                     break;  // オレンジ
+      case 3:  tc = canvas.color565(0, 230, 120);   break;  // 緑
+      default: tc = TFT_DARKGREY;                    break;  // 乗っ取りなし
+    }
+    canvas.setTextColor(tc);
+    int tw = (int)strlen(kTag[md]) * 6;   // size1: 1 文字 6px
+    canvas.setCursor(126 - tw, 86);
+    canvas.print(kTag[md]);
+  }
+
+  // ========== 5段目: end reason ==========
+  // d/t カウントは size1 (小さめ)。空いた縦を上の expr バー拡大に回した。
+  canvas.setTextSize(1);
   canvas.setTextColor(TFT_YELLOW);
   canvas.setCursor(2, 98);
   canvas.printf("d%lu", (unsigned long)s_st.end_d);
-  canvas.setCursor(50, 98);
+  canvas.setCursor(40, 98);
   canvas.printf("t%lu", (unsigned long)s_st.end_t);
 
-  // 直前 end reason: distance=橙 / delta・flush=紫 (2色)
+  // 直前 end reason: distance=橙 / delta・flush=紫 (2色)。ラベルは size2 のまま維持。
+  canvas.setTextSize(2);
   const bool is_dist = (strcmp(s_st.last_cause, "distance") == 0);
   if (s_st.last_cause[0] == '\0') {
     canvas.setTextColor(TFT_DARKGREY);

@@ -54,10 +54,10 @@ REF_DIR.mkdir(parents=True, exist_ok=True)
 # #########################################################################
 # --- 移動平均の窓幅 [サンプル数] ---
 LPF_I_WIN      = 5     # i(t) KRR スコアの中央移動平均
-LPF_SPEED_WIN  = 10     # ベース弓速の平滑
-LPF_ATK_WIN    = 12     # アタック用大窓弓速の平滑
-ATK_SMOOTH_WIN = 2      # アタック dB の平滑 (Cell14)
-ATK_PCT_LPF    = 2      # アタック％グリッドの行方向 LPF (Cell3)
+LPF_SPEED_WIN  = 6     # ベース弓速の平滑
+LPF_ATK_WIN    = 3     # アタック用大窓弓速の平滑
+ATK_SMOOTH_WIN = 3      # アタック dB の平滑 (Cell14)
+ATK_PCT_LPF    = 3      # アタック％グリッドの行方向 LPF (Cell3)
 # --- アタック％グリッドの時間軸 [ms] ---
 ATK_PCT_T_MAX  = 600.0  # グリッド最大時刻
 ATK_PCT_DT     = 10.0   # グリッド刻み
@@ -585,12 +585,25 @@ def apply_dynamic_handoff(nd, remain=HANDOFF_REMAIN):
 # =========================================================================
 _coef_path = Path("output/50F_fit/coeffs_50F.json")
 _c = json.loads(_coef_path.read_text(encoding="utf-8"))
-EXPR_SLOPE, EXPR_INTERCEPT = float(_c["slope"]), float(_c["intercept_ref"])
+EXPR_SLOPE = float(_c["slope"])
 EXPR_MIN, EXPR_MAX = 0.0, 127.0
+
+# --- 上端アンカー（本文 2.7.3「上限値から対応」, 式 eq:upper-anchor-expr）-------------
+# システム値域の上限 L_max（表 tab:output-range のアタック上端 p99, 全 i_A の最大）を
+# 新たな 0 dB と再定義し、expr=127 を対応させる:
+#     d' = db - L_max,   expr = round(127 * 10^(d'/a))
+# 旧実装は 50F 較正の 0dB 基準（expr≈4 が 0dB）をそのまま逆写像していたため、
+# d50=25.91dB が expr≈19 にしか届かず全体が過小音量だった（PLAN.md 2026-07-29）。
+#
+# C++ 側 `db_to_expr_one` は `10^((db - EXPR_INTERCEPT)/EXPR_SLOPE)` の形のままで等価に
+# なるので、焼き込む EXPR_INTERCEPT を下式で置き換える（ファームのコード変更は不要）:
+#     127 * 10^((db - L_max)/a) == 10^((db - (L_max - a*log10(127)))/a)
+EXPR_LMAX = 50.86   # dB, public_release 2.7.3 output_range.json: range_summary.attack_p99_worst.max
+EXPR_INTERCEPT = EXPR_LMAX - EXPR_SLOPE * np.log10(EXPR_MAX)
 
 
 def db_to_expr(db):
-    e = np.power(10.0, (np.asarray(db, float) - EXPR_INTERCEPT) / EXPR_SLOPE)
+    e = EXPR_MAX * np.power(10.0, (np.asarray(db, float) - EXPR_LMAX) / EXPR_SLOPE)
     return np.clip(e, EXPR_MIN, EXPR_MAX)
 
 
@@ -656,8 +669,8 @@ models = dict(
         DELTA_RATIO_CUT=DELTA_RATIO_CUT,
         MIN_DUR_MS=MIN_DUR_MS, ATK_PCT_T_MAX=ATK_PCT_T_MAX, ATK_PCT_DT=ATK_PCT_DT,
         N_T=N_T, N_P=N_P, NAN_SENT=NAN_SENT,
-        EXPR_SLOPE=EXPR_SLOPE, EXPR_INTERCEPT=EXPR_INTERCEPT,
-        EXPR_MIN=EXPR_MIN, EXPR_MAX=EXPR_MAX,
+        EXPR_SLOPE=EXPR_SLOPE, EXPR_INTERCEPT=float(EXPR_INTERCEPT),
+        EXPR_LMAX=EXPR_LMAX, EXPR_MIN=EXPR_MIN, EXPR_MAX=EXPR_MAX,
     ),
     seg_params={k: float(v) for k, v in seg_params.items()},
     krr=dict(T_cap=int(T_cap), n_train=int(KRR_N_TRAIN), gamma=krr_gamma,
@@ -729,6 +742,9 @@ lines.append(f"constexpr int   N_T            = {N_T};")
 lines.append(f"constexpr int   N_P            = {N_P};")
 lines.append(f"constexpr float NAN_SENT       = {cf(NAN_SENT)};")
 lines.append(f"constexpr float EXPR_SLOPE     = {cf(EXPR_SLOPE)};")
+lines.append("// 上端アンカー: L_max を 0dB と再定義し expr=127 を対応（本文 2.7.3, eq:upper-anchor-expr）")
+lines.append(f"constexpr float EXPR_LMAX      = {cf(EXPR_LMAX)};")
+lines.append(f"// EXPR_INTERCEPT = EXPR_LMAX - EXPR_SLOPE*log10(127) （下式を等価に保つための合成値）")
 lines.append(f"constexpr float EXPR_INTERCEPT = {cf(EXPR_INTERCEPT)};")
 lines.append(f"constexpr float EXPR_MIN       = {cf(EXPR_MIN)};")
 lines.append(f"constexpr float EXPR_MAX       = {cf(EXPR_MAX)};")
